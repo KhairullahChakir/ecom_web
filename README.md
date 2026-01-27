@@ -35,7 +35,16 @@ op_ecom/
 
 ## 🚀 Quick Start
 
-### Backend
+### Option 1: Docker (Recommended)
+```bash
+docker-compose up --build
+```
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000/docs`
+
+### Option 2: Manual Setup
+
+#### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
