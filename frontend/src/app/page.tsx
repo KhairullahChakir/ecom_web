@@ -160,7 +160,9 @@ export default function Home() {
     let finalValue: any = value;
 
     if (type === "number") {
-      finalValue = parseFloat(value);
+      // If the input is empty string, keep it as "" to avoid NaN error in React 'value' attribute
+      // When sending to API, we'll ensure it's a number
+      finalValue = value === "" ? "" : parseFloat(value);
     } else if (type === "checkbox") {
       finalValue = (e.target as HTMLInputElement).checked;
     }
@@ -177,10 +179,18 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
+      // Sanitize data: ensure empty strings ("") are converted to 0 for the API
+      const sanitizedData = Object.fromEntries(
+        Object.entries(formData).map(([key, value]) => [
+          key,
+          value === "" ? 0 : value
+        ])
+      );
+
       const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(sanitizedData),
       });
 
       if (!response.ok) throw new Error("API Connection Failed");
