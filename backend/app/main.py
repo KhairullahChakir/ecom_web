@@ -1,13 +1,17 @@
 """
 OP-ECOM: Online Shoppers Purchase Prediction API
-FastAPI backend for fast CPU inference
+FastAPI backend for fast CPU inference using ONNX
 """
 
 import time
-from fastapi import FastAPI
+import os
+import numpy as np
+import joblib
+import onnxruntime as ort
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 app = FastAPI(
     title="OP-ECOM Prediction API",
@@ -24,6 +28,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Paths to model artifacts
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+ONNX_MODEL_PATH = os.path.join(MODELS_DIR, "tabm_best.onnx")
+SCALER_PATH = os.path.join(MODELS_DIR, "onnx_scaler.joblib")
+ENCODERS_PATH = os.path.join(MODELS_DIR, "onnx_label_encoders.joblib")
+
+# Global variables for model artifacts
+session = None
+scaler = None
+label_encoders = None
+
+@app.on_event("startup")
+async def load_model_artifacts():
+    """Load ONNX session and preprocessing artifacts on startup"""
+    global session, scaler, label_encoders
+    try:
+        # Check if files exist
+        for path in [ONNX_MODEL_PATH, SCALER_PATH, ENCODERS_PATH]:
+            if not os.path.exists(path):
+                print(f"Warning: Artifact not found at {path}")
+        
+        # Load ONNX session
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads = 1
+        sess_options.inter_op_num_threads = 1
+        session = ort.InferenceSession(ONNX_MODEL_PATH, sess_options, providers=['CPUExecutionProvider'])
+        
+        # Load scaler and encoders
+        scaler = joblib.load(SCALER_PATH)
+        label_encoders = joblib.load(ENCODERS_PATH)
+        
+        print(f"Successfully loaded model from {ONNX_MODEL_PATH}")
+    except Exception as e:
+        print(f"Error loading model artifacts: {e}")
 
 class PredictRequest(BaseModel):
     """Input features for prediction"""
@@ -45,13 +84,11 @@ class PredictRequest(BaseModel):
     visitor_type: str = "Returning_Visitor"
     weekend: bool = False
 
-
 class PredictResponse(BaseModel):
     """Prediction result"""
     label: str  # YES or NO
     probability: float  # 0-1
     latency_ms: float  # measured time
-
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -59,20 +96,14 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     version: str
 
-
-# Global model placeholder
-model = None
-
-
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
     return HealthResponse(
         status="healthy",
-        model_loaded=model is not None,
+        model_loaded=session is not None,
         version="1.0.0"
     )
-
 
 @app.post("/predict", response_model=PredictResponse)
 async def predict(request: PredictRequest):
@@ -80,21 +111,73 @@ async def predict(request: PredictRequest):
     Predict purchase intent from session features.
     Returns label (YES/NO), probability, and inference latency.
     """
+    if session is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
     start_time = time.perf_counter()
     
-    # TODO: Replace with actual model inference
-    # For now, return mock response
-    probability = 0.65  # Mock probability
-    label = "YES" if probability >= 0.5 else "NO"
-    
-    latency_ms = (time.perf_counter() - start_time) * 1000
-    
-    return PredictResponse(
-        label=label,
-        probability=round(probability, 4),
-        latency_ms=round(latency_ms, 2)
-    )
-
+    try:
+        # 1. Map request to feature vector
+        # Sequence must match training: ['Administrative', 'Administrative_Duration', 'Informational', 'Informational_Duration', 'ProductRelated', 'ProductRelated_Duration', 'BounceRates', 'ExitRates', 'PageValues', 'SpecialDay', 'Month', 'OperatingSystems', 'Browser', 'Region', 'TrafficType', 'VisitorType', 'Weekend']
+        # Note: CSV columns use CamelCase, Pydantic uses snake_case
+        
+        raw_features = [
+            request.administrative,
+            request.administrative_duration,
+            request.informational,
+            request.informational_duration,
+            request.product_related,
+            request.product_related_duration,
+            request.bounce_rates,
+            request.exit_rates,
+            request.page_values,
+            request.special_day,
+            request.month,
+            request.operating_systems,
+            request.browser,
+            request.region,
+            request.traffic_type,
+            request.visitor_type,
+            request.weekend
+        ]
+        
+        # 2. Encode categorical features
+        # Categorical indices in the list above: 10 (Month), 15 (VisitorType), 16 (Weekend)
+        processed_features = list(raw_features)
+        
+        # Mapping for categorical encoding
+        cat_indices = {10: "Month", 15: "VisitorType", 16: "Weekend"}
+        for idx, col_name in cat_indices.items():
+            val = str(processed_features[idx])
+            le = label_encoders[col_name]
+            # Handle unseen categories if necessary, or just transform
+            try:
+                processed_features[idx] = le.transform([val])[0]
+            except ValueError:
+                # Fallback to 0 if category is unknown
+                processed_features[idx] = 0
+        
+        # 3. Scale features
+        features_array = np.array(processed_features).reshape(1, -1)
+        scaled_features = scaler.transform(features_array).astype(np.float32)
+        
+        # 4. Run ONNX inference
+        input_name = session.get_inputs()[0].name
+        onnx_result = session.run(None, {input_name: scaled_features})
+        
+        probability = float(onnx_result[0][0])
+        label = "YES" if probability >= 0.5 else "NO"
+        
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        
+        return PredictResponse(
+            label=label,
+            probability=round(probability, 4),
+            latency_ms=round(latency_ms, 2)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
 @app.get("/")
 async def root():
