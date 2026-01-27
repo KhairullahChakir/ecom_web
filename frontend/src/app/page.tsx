@@ -28,7 +28,8 @@ interface PredictionRequest {
 interface PredictionResponse {
   label: string;
   probability: number;
-  latency_ms: number;
+  inference_latency_ms: number;
+  total_latency_ms: number;
 }
 
 // --- Sample Data ---
@@ -338,8 +339,8 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 gap-4 w-full">
                   <div className="bg-lajawardi-light/30 rounded-xl p-4 border border-lajawardi-primary/5">
-                    <p className="text-xs text-slate-500 font-bold uppercase mb-1">Latency</p>
-                    <p className="text-2xl font-black text-lajawardi-primary">{result.latency_ms} ms</p>
+                    <p className="text-xs text-slate-500 font-bold uppercase mb-1">Inference Time</p>
+                    <p className="text-2xl font-black text-lajawardi-primary">{result.inference_latency_ms} ms</p>
                   </div>
                   <div className="bg-slate-100 rounded-xl p-4 border border-slate-200">
                     <p className="text-xs text-slate-500 font-bold uppercase mb-1">Architecture</p>

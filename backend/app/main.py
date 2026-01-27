@@ -88,7 +88,8 @@ class PredictResponse(BaseModel):
     """Prediction result"""
     label: str  # YES or NO
     probability: float  # 0-1
-    latency_ms: float  # measured time
+    inference_latency_ms: float  # pure model time
+    total_latency_ms: float  # preprocess + model time
 
 class HealthResponse(BaseModel):
     """Health check response"""
@@ -114,13 +115,10 @@ async def predict(request: PredictRequest):
     if session is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
-    start_time = time.perf_counter()
+    start_total = time.perf_counter()
     
     try:
         # 1. Map request to feature vector
-        # Sequence must match training: ['Administrative', 'Administrative_Duration', 'Informational', 'Informational_Duration', 'ProductRelated', 'ProductRelated_Duration', 'BounceRates', 'ExitRates', 'PageValues', 'SpecialDay', 'Month', 'OperatingSystems', 'Browser', 'Region', 'TrafficType', 'VisitorType', 'Weekend']
-        # Note: CSV columns use CamelCase, Pydantic uses snake_case
-        
         raw_features = [
             request.administrative,
             request.administrative_duration,
@@ -142,38 +140,36 @@ async def predict(request: PredictRequest):
         ]
         
         # 2. Encode categorical features
-        # Categorical indices in the list above: 10 (Month), 15 (VisitorType), 16 (Weekend)
         processed_features = list(raw_features)
-        
-        # Mapping for categorical encoding
         cat_indices = {10: "Month", 15: "VisitorType", 16: "Weekend"}
         for idx, col_name in cat_indices.items():
             val = str(processed_features[idx])
             le = label_encoders[col_name]
-            # Handle unseen categories if necessary, or just transform
             try:
                 processed_features[idx] = le.transform([val])[0]
             except ValueError:
-                # Fallback to 0 if category is unknown
                 processed_features[idx] = 0
         
         # 3. Scale features
         features_array = np.array(processed_features).reshape(1, -1)
         scaled_features = scaler.transform(features_array).astype(np.float32)
         
-        # 4. Run ONNX inference
+        # 4. Run ONNX inference (MEASURE THIS SEPARATELY)
+        start_inference = time.perf_counter()
         input_name = session.get_inputs()[0].name
         onnx_result = session.run(None, {input_name: scaled_features})
+        inference_latency_ms = (time.perf_counter() - start_inference) * 1000
         
         probability = float(onnx_result[0][0])
         label = "YES" if probability >= 0.5 else "NO"
         
-        latency_ms = (time.perf_counter() - start_time) * 1000
+        total_latency_ms = (time.perf_counter() - start_total) * 1000
         
         return PredictResponse(
             label=label,
             probability=round(probability, 4),
-            latency_ms=round(latency_ms, 2)
+            inference_latency_ms=round(inference_latency_ms, 2),
+            total_latency_ms=round(total_latency_ms, 2)
         )
         
     except Exception as e:
