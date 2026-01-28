@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shopping Cart - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/about.html" class="nav-link">About</a>
+                <a href="/cart.html" class="nav-link cart-link active">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h1>Shopping Cart</h1>
+            <p>Review your items before checkout</p>
+        </div>
+
+        <div class="cart-items" id="cart-items">
+            <!-- Cart items rendered by JS -->
+        </div>
+
+        <div class="cart-summary" id="cart-summary">
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="cart-total">$0.00</span>
+            </div>
+            <a href="/checkout.html" class="btn btn-success" style="width: 100%; text-align: center;">
+                Proceed to Checkout
+            </a>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Page Type: Administrative</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

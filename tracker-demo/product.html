@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product Details - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+        .product-detail-card {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 3rem;
+        }
+
+        .product-detail-image {
+            font-size: 10rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface-light);
+            border-radius: var(--radius-lg);
+            min-height: 300px;
+        }
+
+        .product-detail-info h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .product-detail-info .price {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .product-detail-info .description {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            line-height: 1.8;
+        }
+
+        @media (max-width: 768px) {
+            .product-detail-card {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link active">Products</a>
+                <a href="/about.html" class="nav-link">About</a>
+                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div id="product-detail">
+            <!-- Product detail rendered by JS -->
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Page Type: ProductRelated (Detail View)</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

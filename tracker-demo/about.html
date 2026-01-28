@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Us - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/about.html" class="nav-link active">About</a>
+                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h1>About ShopDemo</h1>
+            <p>Learn more about our company</p>
+        </div>
+
+        <div class="about-content">
+            <h2>Our Mission</h2>
+            <p>ShopDemo is a demonstration e-commerce platform built to showcase the power of real-time analytics
+                tracking. We believe in data-driven decision making and transparent user experience optimization.</p>
+
+            <h2>How We Track</h2>
+            <p>Every page you visit, every product you view, and every action you take is being tracked by our
+                custom-built OP-ECOM Analytics system. This data is stored in a MariaDB database and can be exported for
+                AI/ML training.</p>
+
+            <h2>The Technology</h2>
+            <p>Our tracker uses a lightweight JavaScript client that communicates with a FastAPI backend. Session data
+                includes page types (Administrative, Informational, ProductRelated), durations, bounce rates, and
+                conversion events.</p>
+
+            <h2>Contact Us</h2>
+            <p>This is a demo site for the OP-ECOM project. For more information, check out the project documentation.
+            </p>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Page Type: Informational</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

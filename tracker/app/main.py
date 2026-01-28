@@ -3,8 +3,10 @@ OP-ECOM Analytics Tracker - FastAPI Main Application
 Self-hosted analytics for collecting real user behavior data
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
 from .tracker_router import router as tracker_router
@@ -27,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for tracker.js
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Include routers
 app.include_router(tracker_router)

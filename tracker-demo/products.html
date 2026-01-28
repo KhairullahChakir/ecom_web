@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link active">Products</a>
+                <a href="/about.html" class="nav-link">About</a>
+                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h1>Our Products</h1>
+            <p>Browse our premium collection</p>
+        </div>
+
+        <div class="product-grid" id="products-grid">
+            <!-- Products rendered by JS -->
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Page Type: ProductRelated</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

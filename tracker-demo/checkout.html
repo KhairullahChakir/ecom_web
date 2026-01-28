@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkout - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/about.html" class="nav-link">About</a>
+                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="page-header">
+            <h1>Checkout</h1>
+            <p>Complete your purchase</p>
+        </div>
+
+        <div class="checkout-form">
+            <h2>Shipping Information</h2>
+
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" placeholder="John Doe" />
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="john@example.com" />
+            </div>
+
+            <div class="form-group">
+                <label for="address">Address</label>
+                <input type="text" id="address" placeholder="123 Main St" />
+            </div>
+
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" placeholder="New York" />
+            </div>
+
+            <h2 style="margin-top: 2rem;">Payment Information</h2>
+
+            <div class="form-group">
+                <label for="card">Card Number</label>
+                <input type="text" id="card" placeholder="1234 5678 9012 3456" />
+            </div>
+
+            <div class="form-group">
+                <label for="expiry">Expiry Date</label>
+                <input type="text" id="expiry" placeholder="MM/YY" />
+            </div>
+
+            <button class="btn btn-success" style="width: 100%; margin-top: 1rem;" onclick="completePurchase()">
+                🎉 Complete Purchase
+            </button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Page Type: Administrative (Checkout)</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

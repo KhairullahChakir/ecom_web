@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Order Complete! - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">🛒 ShopDemo</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/about.html" class="nav-link">About</a>
+                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="success-message">
+            <div class="success-icon">🎉</div>
+            <h1>Order Complete!</h1>
+            <p>Thank you for your purchase. Your order has been processed successfully.</p>
+            <p style="margin-top: 2rem; color: var(--success);">
+                ✅ <strong>Revenue = TRUE</strong> recorded in database!
+            </p>
+            <p style="color: var(--text-muted); margin-top: 1rem;">
+                This conversion event has been tracked by OP-ECOM Analytics.
+            </p>
+            <a href="/" class="btn btn-primary" style="margin-top: 2rem;">
+                Continue Shopping
+            </a>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ShopDemo - OP-ECOM Analytics Demo</p>
+        <p class="tracker-info">📡 Conversion Tracked! Revenue = TRUE</p>
+    </footer>
+
+    <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
