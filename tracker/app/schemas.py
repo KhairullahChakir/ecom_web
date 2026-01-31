@@ -57,7 +57,14 @@ class EventRequest(BaseModel):
 # --- Purchase Schema ---
 class PurchaseRequest(BaseModel):
     session_id: str
-    order_value: float = 0.0
+    order_value: float
+
+class IntentCheckRequest(BaseModel):
+    session_id: str
+
+class IntentCheckResponse(BaseModel):
+    probability: float
+    should_intervene: bool
 
 # --- Admin Schemas ---
 class SessionSummary(BaseModel):

@@ -4,6 +4,7 @@ Endpoints for tracking sessions, page views, and events
 """
 
 import uuid
+import requests
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
@@ -13,8 +14,11 @@ from .database import get_db
 from .models import Session, PageView, Event, VisitorType, PageType
 from .schemas import (
     SessionStartRequest, SessionStartResponse, SessionEndRequest,
-    PageViewRequest, EventRequest, PurchaseRequest
+    PageViewRequest, EventRequest, PurchaseRequest,
+    IntentCheckRequest, IntentCheckResponse
 )
+
+PREDICTION_API_URL = "http://localhost:8000/predict"
 
 router = APIRouter(prefix="/tracker", tags=["Tracker"])
 
@@ -161,3 +165,69 @@ async def track_purchase(request: PurchaseRequest, db: DBSession = Depends(get_d
     db.commit()
     
     return {"message": "Purchase recorded", "session_id": request.session_id}
+
+# --- Intent Check Endpoint (Exit Intent) ---
+@router.post("/check-intent", response_model=IntentCheckResponse)
+async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_db)):
+    """Check purchase intent for exit intervention"""
+    session = db.query(Session).filter(Session.session_id == request.session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # 1. Aggregate current session stats
+    page_views = db.query(PageView).filter(PageView.session_id == request.session_id).all()
+    
+    product_pages = [p for p in page_views if p.page_type == PageType.ProductRelated]
+    admin_pages = [p for p in page_views if p.page_type == PageType.Administrative]
+    info_pages = [p for p in page_views if p.page_type == PageType.Informational]
+    
+    total_pages = len(page_views)
+    bounce_rate = 0.0
+    exit_rate = 0.0
+    avg_page_value = 0.0
+    
+    if total_pages > 0:
+        bounce_count = sum(1 for p in page_views if p.is_bounce)
+        # Calculate exit count dynamically (last page is potential exit)
+        exit_count = sum(1 for p in page_views if p.is_exit)
+        bounce_rate = bounce_count / total_pages
+        exit_rate = exit_count / total_pages
+        avg_page_value = sum(p.page_value for p in page_views) / total_pages
+
+    # 2. Build feature vector for Prediction API
+    features = {
+        "administrative": len(admin_pages),
+        "administrative_duration": sum(p.duration_seconds for p in admin_pages),
+        "informational": len(info_pages),
+        "informational_duration": sum(p.duration_seconds for p in info_pages),
+        "product_related": len(product_pages),
+        "product_related_duration": sum(p.duration_seconds for p in product_pages),
+        "bounce_rates": bounce_rate,
+        "exit_rates": exit_rate,
+        "page_values": avg_page_value,
+        "special_day": session.special_day or 0.0,
+        "month": session.month,
+        "operating_systems": 2, # Placeholder or map from session.operating_system logic
+        "browser": 2,           # Placeholder
+        "region": session.region,
+        "traffic_type": session.traffic_type,
+        "visitor_type": session.visitor_type.name,
+        "weekend": session.is_weekend
+    }
+    
+    # 3. Call Prediction API
+    try:
+        response = requests.post(PREDICTION_API_URL, json=features, timeout=1.0)
+        result = response.json()
+        probability = result.get("probability", 0.0)
+    except Exception as e:
+        print(f"Prediction API Error: {e}")
+        probability = 0.0 # Default to low intent on error
+
+    # 4. Decision Logic (Intervene if High Intent)
+    should_intervene = probability > 0.70
+    
+    return IntentCheckResponse(
+        probability=probability,
+        should_intervene=should_intervene
+    )

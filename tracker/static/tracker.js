@@ -168,9 +168,90 @@
         currentPageUrl = window.location.href;
     }
 
+    // Exit Intent & Intervention
+    let exitIntentChecked = false;
+
+    async function checkExitIntent() {
+        if (!sessionId || exitIntentChecked) return;
+        exitIntentChecked = true; // Check only once per session/page load to avoid spam
+
+        console.log('[OP-ECOM Tracker] Checking exit intent...');
+        const result = await sendToAPI('/tracker/check-intent', {
+            session_id: sessionId
+        });
+
+        if (result && result.should_intervene) {
+            showInterventionPopup(result.probability);
+        }
+    }
+
+    function showInterventionPopup(probability) {
+        // Create popup elements
+        const overlay = document.createElement('div');
+        overlay.id = 'op-ecom-overlay';
+        Object.assign(overlay.style, {
+            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.7)', zIndex: '9999', display: 'flex',
+            justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)'
+        });
+
+        const popup = document.createElement('div');
+        Object.assign(popup.style, {
+            backgroundColor: 'white', padding: '2rem', borderRadius: '15px',
+            maxWidth: '400px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            fontFamily: "'Segoe UI', sans-serif"
+        });
+
+        const percent = Math.round(probability * 100);
+        popup.innerHTML = `
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🎁</div>
+            <h2 style="color: #1E4FA8; margin-bottom: 0.5rem;">Wait! Don't Go!</h2>
+            <p style="color: #666; margin-bottom: 1.5rem;">
+                We see you're interested! Here is a special discount just for you.
+            </p>
+            <div style="background: #eef2ff; padding: 10px; border-radius: 8px; margin-bottom: 1.5rem;">
+                <code style="font-size: 1.5rem; color: #1E4FA8; font-weight: bold;">OP-ECOM-${percent}</code>
+            </div>
+            <button id="op-ecom-claim" style="
+                background: #1E4FA8; color: white; border: none; padding: 12px 24px;
+                font-size: 1.1rem; border-radius: 8px; cursor: pointer; width: 100%;
+                transition: transform 0.2s;"
+            >Claim Discount</button>
+            <button id="op-ecom-close" style="
+                background: transparent; border: none; color: #999; margin-top: 1rem;
+                cursor: pointer; text-decoration: underline;"
+            >No thanks, I'll pay full price</button>
+            <div style="margin-top: 1rem; font-size: 0.8rem; color: #ccc;">
+                AI Confidence: ${percent}%
+            </div>
+        `;
+
+        overlay.appendChild(popup);
+        document.body.appendChild(overlay);
+
+        // Handlers
+        document.getElementById('op-ecom-claim').onclick = () => {
+            trackEvent('click', 'intervention', 'claim_discount', percent);
+            overlay.remove();
+        };
+        document.getElementById('op-ecom-close').onclick = () => {
+            trackEvent('click', 'intervention', 'dismiss', 0);
+            overlay.remove();
+        };
+    }
+
+    function setupExitIntent() {
+        document.addEventListener('mouseleave', (e) => {
+            if (e.clientY < 50) { // Top of screen
+                checkExitIntent();
+            }
+        });
+    }
+
     // Initialize
     async function init() {
         await startSession();
+        setupExitIntent();
 
         // Track page views on navigation
         window.addEventListener('beforeunload', () => {
