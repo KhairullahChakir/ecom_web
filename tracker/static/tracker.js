@@ -59,6 +59,35 @@
         return 'ProductRelated';
     }
 
+    function getPageValue() {
+        // 1. Check if we are on the Cart page (High Intent)
+        if (window.location.pathname.includes('cart.html')) {
+            return 20.0; // High value for being in the cart
+        }
+
+        // 2. Check for product detail page container
+        const detailContainer = document.getElementById('product-detail');
+        if (detailContainer && detailContainer.getAttribute('data-page-value')) {
+            const val = parseFloat(detailContainer.getAttribute('data-page-value'));
+            console.log(`[OP-ECOM Tracker] Found Detail PageValue: ${val}`);
+            return val;
+        }
+
+        // 2. Try to find the first product card in view or any card with value
+        const cards = document.querySelectorAll('[data-page-value]');
+        if (cards.length > 0) {
+            // If many cards (like grid), taking an average or the first one
+            // In UCI, it's the value of the page. Grid page usually has 0 value in UCI,
+            // but for demo we can assign it the avg of products on it.
+            let sum = 0;
+            cards.forEach(c => sum += parseFloat(c.getAttribute('data-page-value') || 0));
+            const avg = sum / cards.length;
+            console.log(`[OP-ECOM Tracker] Found Grid Avg PageValue: ${avg}`);
+            return avg;
+        }
+        return 0;
+    }
+
     async function sendToAPI(endpoint, data) {
         try {
             const response = await fetch(`${API_URL}${endpoint}`, {
@@ -128,9 +157,9 @@
             page_url: currentPageUrl,
             page_title: document.title,
             duration_seconds: duration,
-            is_bounce: duration < 5,
+            is_bounce: duration < 1,
             is_exit: false,
-            page_value: 0,
+            page_value: getPageValue(),
             scroll_depth: Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100) || 0
         });
     }
@@ -173,6 +202,15 @@
 
     async function checkExitIntent() {
         if (!sessionId || exitIntentChecked) return;
+
+        // NEW: Avoid triggering if the user has been on the page for less than 3 seconds
+        // This prevents immediate popups on refresh/landing
+        const dwellTime = (Date.now() - currentPageStart) / 1000;
+        if (dwellTime < 3) {
+            console.log(`[OP-ECOM Tracker] Exit intent ignored: session too short (${dwellTime.toFixed(1)}s)`);
+            return;
+        }
+
         exitIntentChecked = true; // Check only once per session/page load to avoid spam
 
         console.log('[OP-ECOM Tracker] Checking exit intent...');
@@ -180,8 +218,12 @@
             session_id: sessionId
         });
 
+        console.log('[OP-ECOM Tracker] Intent Result:', result);
+
         if (result && result.should_intervene) {
             showInterventionPopup(result.probability);
+        } else {
+            console.log('[OP-ECOM Tracker] Probability too low for intervention:', result?.probability);
         }
     }
 
@@ -270,17 +312,21 @@
             currentPageUrl = window.location.href;
         };
 
-        // End session on page close
-        window.addEventListener('unload', endSession);
+        // End session on page close (modern)
+        window.addEventListener('pagehide', endSession);
 
-        console.log('[OP-ECOM Tracker] Initialized');
+        console.log('[OP-ECOM Tracker] Initialized. Move mouse to top to test Exit Intent.');
     }
 
     // Expose global API
     window.opEcomTracker = {
         trackEvent,
         trackPurchase,
-        getSessionId: () => sessionId
+        getSessionId: () => sessionId,
+        checkExitIntent: () => {
+            exitIntentChecked = false; // Reset lock for manual test
+            checkExitIntent();
+        }
     };
 
     // Start tracking

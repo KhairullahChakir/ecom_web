@@ -149,12 +149,11 @@ async def predict(request: PredictRequest):
                 processed_features[idx] = le.transform([val])[0]
             except ValueError:
                 processed_features[idx] = 0
-        
         # 3. Scale features
         features_array = np.array(processed_features).reshape(1, -1)
         scaled_features = scaler.transform(features_array).astype(np.float32)
         
-        # 4. Run ONNX inference (MEASURE THIS SEPARATELY)
+        # 4. Run ONNX inference
         start_inference = time.perf_counter()
         input_name = session.get_inputs()[0].name
         onnx_result = session.run(None, {input_name: scaled_features})
@@ -167,7 +166,7 @@ async def predict(request: PredictRequest):
         
         return PredictResponse(
             label=label,
-            probability=round(probability, 4),
+            probability=probability,
             inference_latency_ms=round(inference_latency_ms, 2),
             total_latency_ms=round(total_latency_ms, 2)
         )

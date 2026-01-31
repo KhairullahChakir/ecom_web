@@ -72,7 +72,7 @@ function renderCart() {
   }
 
   cartContainer.innerHTML = cart.map((item, index) => `
-    <div class="cart-item">
+    <div class="cart-item" data-page-value="${item.pageValue || 0}">
       <div class="cart-item-image">${item.emoji}</div>
       <div class="cart-item-details">
         <div class="cart-item-name">${item.name}</div>
@@ -132,6 +132,9 @@ function renderProductDetail() {
     container.innerHTML = '<p>Product not found</p>';
     return;
   }
+
+  // Set page value for tracker to pick up
+  container.setAttribute('data-page-value', product.pageValue);
 
   container.innerHTML = `
     <div class="product-detail-card">
