@@ -19,7 +19,6 @@ import joblib
 import json
 from datetime import datetime
 
-# Try to import tabm, fall back to custom implementation if not available
 try:
     from tabm import TabM
     TABM_AVAILABLE = True

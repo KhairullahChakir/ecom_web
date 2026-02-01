@@ -24,39 +24,39 @@ A fast CPU inference ML service predicting **purchase intent** using the UCI Onl
 
 ## 📁 Project Structure
 
-```
-op_ecom/
-├── backend/          # FastAPI + ML service
-├── frontend/         # Next.js demo website
-├── notebooks/        # Training & experiments
-├── data/             # Dataset
-└── reports/          # Metrics & figures
-```
+| Component | Path | Technology | Port |
+|-----------|------|------------|------|
+| **AI Brain** | `backend/` | FastAPI + ONNX | 8000 |
+| **Tracker API** | `tracker/` | FastAPI + MariaDB | 8001 |
+| **Predictor UI** | `frontend/` | Next.js | 3000 |
+| **E-com Demo** | `tracker-demo/` | Vite + Vue | 5173 |
 
-## 🚀 Quick Start
+## 🚀 Running the Project (Developer Shortcut)
 
-### Option 1: Docker (Recommended)
-```bash
-docker-compose up --build
-```
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000/docs`
+The easiest way to work on the project in VS Code is to use **one single virtual environment** at the root.
 
-### Option 2: Manual Setup
-
-#### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+### 1. Create & Activate Environment
+```powershell
+# Run from D:\op_ecom
+python -m venv venv
+.\venv\Scripts\activate
 ```
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+### 2. Install All Dependencies
+```powershell
+pip install fastapi uvicorn pandas numpy scikit-learn xgboost torch onnxruntime sqlalchemy mysqlclient requests python-multipart
 ```
+
+### 3. VS Code Integration
+*   Press `Ctrl + Shift + P`.
+*   Select **Python: Select Interpreter**.
+*   Choose the root `.\venv\Scripts\python.exe`. (This clears all red squiggles in your code!)
+
+### 4. Start the Servers (Different Terminals)
+*   **AI Brain**: `python -m uvicorn backend.app.main:app --port 8000`
+*   **Tracker**: `python -m uvicorn tracker.app.main:app --port 8001`
+*   **Predictor UI**: `cd frontend; npm run dev`
+*   **E-com Demo**: `cd tracker-demo; npm run dev`
 
 ## 📊 API Endpoints
 
