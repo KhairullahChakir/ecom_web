@@ -118,8 +118,9 @@ async def predict(request: PredictRequest):
     start_total = time.perf_counter()
     
     try:
-        # 1. Map request to feature vector
-        raw_features = [
+        # Define feature groups structure (must match model training order)
+        # Numerical: [Admin, AdminDur, Info, InfoDur, Prod, ProdDur, Bounce, Exit, PageVal, SpecDay]
+        num_features = [
             request.administrative,
             request.administrative_duration,
             request.informational,
@@ -129,37 +130,89 @@ async def predict(request: PredictRequest):
             request.bounce_rates,
             request.exit_rates,
             request.page_values,
-            request.special_day,
-            request.month,
-            request.operating_systems,
-            request.browser,
-            request.region,
-            request.traffic_type,
-            request.visitor_type,
-            request.weekend
+            request.special_day
         ]
+
+        # Categorical: [Month, VisitorType, Weekend, OS, Browser, Region, TrafficType]
+        # Note: Order matches load_and_preprocess in training notebook
+        cat_features_raw = {
+            'Month': request.month,
+            'VisitorType': request.visitor_type,
+            'Weekend': str(request.weekend), # boolean to string
+            'OperatingSystems': str(request.operating_systems),
+            'Browser': str(request.browser),
+            'Region': str(request.region),
+            'TrafficType': str(request.traffic_type)
+        }
         
-        # 2. Encode categorical features
-        processed_features = list(raw_features)
-        cat_indices = {10: "Month", 15: "VisitorType", 16: "Weekend"}
-        for idx, col_name in cat_indices.items():
-            val = str(processed_features[idx])
-            le = label_encoders[col_name]
-            try:
-                processed_features[idx] = le.transform([val])[0]
-            except ValueError:
-                processed_features[idx] = 0
-        # 3. Scale features
-        features_array = np.array(processed_features).reshape(1, -1)
-        scaled_features = scaler.transform(features_array).astype(np.float32)
+        # 1. Process Categorical (Label Encode)
+        # Order: ['Month', 'VisitorType', 'Weekend', 'OperatingSystems', 'Browser', 'Region', 'TrafficType']
+        # Note: Only Month, VisitorType, and Weekend match the label_encoders keys. 
+        # The others (OS, Browser, Region, Traffic) are already ints and don't need encoding.
         
-        # 4. Run ONNX inference
+        cols_needing_encoding = ['Month', 'VisitorType', 'Weekend']
+        cat_order = ['Month', 'VisitorType', 'Weekend', 'OperatingSystems', 'Browser', 'Region', 'TrafficType']
+        x_cat = []
+        
+        for col in cat_order:
+            val = cat_features_raw[col]
+            
+            if col in cols_needing_encoding:
+                le = label_encoders[col]
+                try:
+                    encoded_val = le.transform([val])[0]
+                except ValueError:
+                    encoded_val = 0
+            else:
+                # For OS, Browser, etc., just use the integer value directly
+                try:
+                    encoded_val = int(request.operating_systems if col == 'OperatingSystems' else 
+                                      request.browser if col == 'Browser' else
+                                      request.region if col == 'Region' else
+                                      request.traffic_type)
+                except:
+                    encoded_val = 0
+                    
+            x_cat.append(encoded_val)
+            
+        x_cat_np = np.array(x_cat, dtype=np.int64).reshape(1, -1)
+
+        # 2. Process Numerical (Scale)
+        # The scaler expects ALL 17 features (Num + Cat) because it was fitted on the full dataset.
+        # We must construct the full vector, scale it, extract the numerical part, 
+        # but keep the original INTEGER categorical values for the TabM embedding layers.
+        
+        x_num_np = np.array(num_features, dtype=np.float32).reshape(1, -1)
+        
+        # Combine [Num, Cat] to match the 17 features expected by StandardScaler
+        # Note: We assume the order is Numerical (10) + Categorical (7) based on standard pipeline
+        x_full = np.concatenate([x_num_np, x_cat_np], axis=1)
+        
+        # Transform everything
+        x_full_scaled = scaler.transform(x_full).astype(np.float32)
+        
+        # Extract ONLY the numerical columns (first 10) for the model input
+        # The model wants Scaled Numerical + Integer Categorical
+        x_num_scaled = x_full_scaled[:, :10]
+        
+        # 3. Run ONNX inference
         start_inference = time.perf_counter()
-        input_name = session.get_inputs()[0].name
-        onnx_result = session.run(None, {input_name: scaled_features})
+        
+        # Inputs matching the pruned model export
+        ort_inputs = {
+            'input_cat': x_cat_np,
+            'input_num': x_num_scaled
+        }
+        
+        onnx_result = session.run(None, ort_inputs)
         inference_latency_ms = (time.perf_counter() - start_inference) * 1000
         
-        probability = float(onnx_result[0][0])
+        # Output is logits or probability depending on model; TabM usually outputs logits, we apply Sigmoid
+        output_val = float(onnx_result[0][0])
+        
+        # Apply Sigmoid since the model output is likely raw logits (BCEWithLogitsLoss was used)
+        probability = 1 / (1 + np.exp(-output_val))
+        
         label = "YES" if probability >= 0.5 else "NO"
         
         total_latency_ms = (time.perf_counter() - start_total) * 1000
@@ -167,11 +220,13 @@ async def predict(request: PredictRequest):
         return PredictResponse(
             label=label,
             probability=probability,
-            inference_latency_ms=round(inference_latency_ms, 2),
+            inference_latency_ms=round(inference_latency_ms, 4),
             total_latency_ms=round(total_latency_ms, 2)
         )
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
 @app.get("/")
