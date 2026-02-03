@@ -23,7 +23,7 @@ from .schemas import (
 
 # Model paths
 PREDICTION_API_URL = "http://localhost:8000/predict"
-TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "models", "abandonment_transformer.onnx")
+TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "backend", "models", "abandonment_transformer.onnx")
 
 # Initialize Abandonment Transformer (if available)
 abandonment_session = None
@@ -284,16 +284,17 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     # 4. ==========================================
     #    DECISION LOGIC: Dual-Signal Intervention
     #    Intervene if:
-    #      - User is likely to LEAVE (abandonment > 70%)
-    #      - AND User is likely to BUY (purchase > 12%)
+    #      - User is likely to LEAVE (abandonment > 40%)
+    #      - AND User is likely to BUY (purchase > 5%)
     #      - AND User has seen at least 1 product
     # ==========================================
     seen_product = len(product_pages) > 0
     should_intervene = (
-        abandonment_prob > 0.70 and 
-        purchase_prob > 0.12 and 
+        abandonment_prob > 0.40 and 
+        purchase_prob > 0.05 and 
         seen_product
     )
+
     
     # Return the combined probability (weighted average for display)
     combined_prob = (abandonment_prob * 0.4 + purchase_prob * 0.6) if should_intervene else purchase_prob
