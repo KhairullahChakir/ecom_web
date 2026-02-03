@@ -24,13 +24,14 @@ htmlcov/
 *.h5
 *.pkl
 *.joblib
-*.onnx
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-models/*.onnx
-models/*.pkl
+*.npy
+*.csv
+/scripts/data/*.csv
+/scripts/data/*.npy
+/scripts/data/item_properties_*
+!/scripts/data/*.onnx
+!/scripts/data/*.pth
+!/backend/models/*.onnx
 
 # Node.js
 node_modules/
