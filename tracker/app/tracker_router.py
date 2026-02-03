@@ -224,10 +224,11 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     except Exception:
         probability = 0.0 
 
-    # 4. Decision Logic (Model-Only)
-    # The user wants to rely STRICTLY on the ML model's prediction.
-    # Adjusted threshold for New Visitors (who naturally have lower scores than returning buyers).
-    should_intervene = (probability > 0.00001)
+    # 4. Decision Logic (Smart Intervention)
+    # Only intervene if the AI has at least 12% confidence AND the user has seen at least 1 product.
+    # This prevents popups for casual "landing-page-only" visitors.
+    seen_product = len(product_pages) > 0
+    should_intervene = (probability > 0.12) and seen_product
     
     return IntentCheckResponse(
         probability=probability,
