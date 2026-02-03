@@ -23,18 +23,18 @@ from .schemas import (
 
 # Model paths
 PREDICTION_API_URL = "http://localhost:8000/predict"
-TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "backend", "models", "abandonment_transformer.onnx")
+TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "backend", "models", "abandonment_model.onnx")
 
-# Initialize Abandonment Transformer (if available)
+# Initialize Abandonment Model (Final choice: TCN for speed)
 abandonment_session = None
 try:
     if os.path.exists(TRANSFORMER_MODEL_PATH):
         abandonment_session = ort.InferenceSession(TRANSFORMER_MODEL_PATH)
-        print(f"✅ Loaded Abandonment Transformer from {TRANSFORMER_MODEL_PATH}")
+        print(f"✅ Loaded Abandonment model from {TRANSFORMER_MODEL_PATH}")
     else:
-        print(f"⚠️ Abandonment Transformer not found at {TRANSFORMER_MODEL_PATH}")
+        print(f"⚠️ Abandonment model not found at {TRANSFORMER_MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ Failed to load Abandonment Transformer: {e}")
+    print(f"⚠️ Failed to load Abandonment model: {e}")
 
 # Page type mapping for Transformer input
 PAGE_TYPE_TO_IDX = {
