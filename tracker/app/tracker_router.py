@@ -5,6 +5,9 @@ Endpoints for tracking sessions, page views, and events
 
 import uuid
 import requests
+import numpy as np
+import onnxruntime as ort
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
@@ -18,7 +21,27 @@ from .schemas import (
     IntentCheckRequest, IntentCheckResponse
 )
 
+# Model paths
 PREDICTION_API_URL = "http://localhost:8000/predict"
+TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "models", "abandonment_transformer.onnx")
+
+# Initialize Abandonment Transformer (if available)
+abandonment_session = None
+try:
+    if os.path.exists(TRANSFORMER_MODEL_PATH):
+        abandonment_session = ort.InferenceSession(TRANSFORMER_MODEL_PATH)
+        print(f"✅ Loaded Abandonment Transformer from {TRANSFORMER_MODEL_PATH}")
+    else:
+        print(f"⚠️ Abandonment Transformer not found at {TRANSFORMER_MODEL_PATH}")
+except Exception as e:
+    print(f"⚠️ Failed to load Abandonment Transformer: {e}")
+
+# Page type mapping for Transformer input
+PAGE_TYPE_TO_IDX = {
+    'Home': 1, 'Product': 2, 'ProductDetail': 3, 'Cart': 4, 
+    'Checkout': 5, 'About': 6, 'Account': 7,
+    'Administrative': 4, 'Informational': 6, 'ProductRelated': 2  # Map DB enums
+}
 
 router = APIRouter(prefix="/tracker", tags=["Tracker"])
 
@@ -193,44 +216,89 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         exit_count = sum(1 for p in page_views if p.is_exit)
         bounce_rate = bounce_count / total_pages
         exit_rate = exit_count / total_pages
-        avg_page_value = sum(p.page_value for p in page_views) / total_pages
-
-    # 2. Build feature vector for Prediction API
-    features = {
-        "administrative": len(admin_pages),
-        "administrative_duration": sum(p.duration_seconds for p in admin_pages),
-        "informational": len(info_pages),
-        "informational_duration": sum(p.duration_seconds for p in info_pages),
-        "product_related": len(product_pages),
-        "product_related_duration": sum(p.duration_seconds for p in product_pages),
-        "bounce_rates": bounce_rate,
-        "exit_rates": exit_rate,
-        "page_values": avg_page_value,
-        "special_day": session.special_day or 0.0,
-        "month": session.month,
-        "operating_systems": 2, 
-        "browser": 2,           
-        "region": session.region,
-        "traffic_type": session.traffic_type,
-        "visitor_type": session.visitor_type.name,
-        "weekend": session.is_weekend
-    }
+        # 2. ==========================================
+    #    STEP 1: Run Abandonment Transformer (LSTM/Transformer)
+    #    This predicts if the user is ABOUT TO LEAVE.
+    # ==========================================
+    abandonment_prob = 0.5  # Default fallback
     
-    # 3. Call Prediction API
-    try:
-        response = requests.post(PREDICTION_API_URL, json=features, timeout=2.0)
-        result = response.json()
-        probability = result.get("probability", 0.0)
-    except Exception:
-        probability = 0.0 
+    if abandonment_session is not None and len(page_views) >= 1:
+        # Build sequence for Transformer
+        max_seq_len = 20
+        page_ids = np.zeros((1, max_seq_len), dtype=np.int64)
+        durations = np.zeros((1, max_seq_len), dtype=np.float32)
+        
+        for i, pv in enumerate(page_views[:max_seq_len]):
+            page_type_name = pv.page_type.name if hasattr(pv.page_type, 'name') else str(pv.page_type)
+            page_ids[0, i] = PAGE_TYPE_TO_IDX.get(page_type_name, 2)  # Default to Product
+            durations[0, i] = min(pv.duration_seconds, 180.0) / 180.0  # Normalize
+        
+        # Run inference
+        try:
+            result = abandonment_session.run(None, {
+                'page_ids': page_ids,
+                'durations': durations
+            })
+            # Apply sigmoid to logits
+            logits = result[0][0][0]
+            abandonment_prob = 1 / (1 + np.exp(-logits))
+        except Exception as e:
+            print(f"Transformer inference error: {e}")
+            abandonment_prob = 0.5
+    
+    # 3. ==========================================
+    #    STEP 2: Only call TabM if abandonment risk is HIGH
+    #    This saves compute and makes the system smarter.
+    # ==========================================
+    purchase_prob = 0.0
+    
+    # Only call TabM if user is likely to leave (abandonment > 70%)
+    if abandonment_prob > 0.70:
+        features = {
+            "administrative": len(admin_pages),
+            "administrative_duration": sum(p.duration_seconds for p in admin_pages),
+            "informational": len(info_pages),
+            "informational_duration": sum(p.duration_seconds for p in info_pages),
+            "product_related": len(product_pages),
+            "product_related_duration": sum(p.duration_seconds for p in product_pages),
+            "bounce_rates": bounce_rate,
+            "exit_rates": exit_rate,
+            "page_values": avg_page_value,
+            "special_day": session.special_day or 0.0,
+            "month": session.month,
+            "operating_systems": 2, 
+            "browser": 2,           
+            "region": session.region,
+            "traffic_type": session.traffic_type,
+            "visitor_type": session.visitor_type.name,
+            "weekend": session.is_weekend
+        }
+        
+        try:
+            response = requests.post(PREDICTION_API_URL, json=features, timeout=2.0)
+            result = response.json()
+            purchase_prob = result.get("probability", 0.0)
+        except Exception:
+            purchase_prob = 0.0
 
-    # 4. Decision Logic (Smart Intervention)
-    # Only intervene if the AI has at least 12% confidence AND the user has seen at least 1 product.
-    # This prevents popups for casual "landing-page-only" visitors.
+    # 4. ==========================================
+    #    DECISION LOGIC: Dual-Signal Intervention
+    #    Intervene if:
+    #      - User is likely to LEAVE (abandonment > 70%)
+    #      - AND User is likely to BUY (purchase > 12%)
+    #      - AND User has seen at least 1 product
+    # ==========================================
     seen_product = len(product_pages) > 0
-    should_intervene = (probability > 0.12) and seen_product
+    should_intervene = (
+        abandonment_prob > 0.70 and 
+        purchase_prob > 0.12 and 
+        seen_product
+    )
+    
+    # Return the combined probability (weighted average for display)
+    combined_prob = (abandonment_prob * 0.4 + purchase_prob * 0.6) if should_intervene else purchase_prob
     
     return IntentCheckResponse(
-        probability=probability,
+        probability=combined_prob,
         should_intervene=should_intervene
     )
