@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .database import engine, Base
 from .tracker_router import router as tracker_router
 from .admin_router import router as admin_router
+from .analytics_router import router as analytics_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -38,6 +39,7 @@ if os.path.exists(static_dir):
 # Include routers
 app.include_router(tracker_router)
 app.include_router(admin_router)
+app.include_router(analytics_router)
 
 @app.get("/")
 async def root():
