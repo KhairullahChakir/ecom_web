@@ -230,6 +230,9 @@
     }
 
     function showInterventionPopup(probability, discountPercent) {
+        // Track that popup was shown (event_type must match analytics query)
+        trackEvent('exit_intent_shown', 'intervention', 'popup_displayed', Math.round(probability * 100));
+
         // Get cart value for personalized discount
         const cart = JSON.parse(localStorage.getItem('cart') || '[]');
         const cartValue = cart.reduce((sum, item) => sum + (item.price || 0), 0);

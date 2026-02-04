@@ -44,11 +44,12 @@ try:
 except Exception as e:
     print(f"⚠️ Failed to load Abandonment model: {e}")
 
-# Page type mapping for Transformer input
+# Page type mapping for TCN input (model was trained with num_page_types=4)
+# All indices must be in range [0, 3]
 PAGE_TYPE_TO_IDX = {
-    'Home': 1, 'Product': 2, 'ProductDetail': 3, 'Cart': 4, 
-    'Checkout': 5, 'About': 6, 'Account': 7,
-    'Administrative': 4, 'Informational': 6, 'ProductRelated': 2  # Map DB enums
+    'Home': 0, 'Product': 1, 'ProductDetail': 1, 'Cart': 2, 
+    'Checkout': 2, 'About': 3, 'Account': 3,
+    'Administrative': 2, 'Informational': 3, 'ProductRelated': 1  # Map DB enums
 }
 
 router = APIRouter(prefix="/tracker", tags=["Tracker"])
@@ -297,10 +298,9 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     #      - AND User has seen at least 1 product
     # ==========================================
     seen_product = len(product_pages) > 0
-    # Dual-signal intervention: user must be leaving AND likely to buy
+    # TESTING: Simplified logic - only check abandonment
     should_intervene = (
-        abandonment_prob > 0.70 and   # User likely to leave (70%+)
-        purchase_prob > 0.05 and      # User likely to buy (5%+)
+        abandonment_prob > 0.40 and   # Lower threshold for testing (40%)
         seen_product                   # User has viewed at least 1 product
     )
 
