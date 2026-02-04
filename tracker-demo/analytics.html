@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytics Dashboard - ShopDemo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      .dashboard {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .dashboard-header {
+        margin-bottom: 2rem;
+      }
+      .dashboard-header h1 {
+        font-size: 2rem;
+        color: #fff;
+        margin-bottom: 0.5rem;
+      }
+      .dashboard-header p {
+        color: #94a3b8;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      .kpi-card {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        padding: 1.5rem;
+        border-radius: 1rem;
+        color: white;
+      }
+      .kpi-card.purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+      .kpi-card.green { background: linear-gradient(135deg, #10b981, #059669); }
+      .kpi-card.orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+      .kpi-card h3 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        opacity: 0.8;
+        margin-bottom: 0.5rem;
+      }
+      .kpi-card .value {
+        font-size: 2.5rem;
+        font-weight: bold;
+      }
+      .kpi-card .subtitle {
+        font-size: 0.875rem;
+        opacity: 0.7;
+        margin-top: 0.25rem;
+      }
+      .chart-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+      @media (max-width: 768px) {
+        .chart-section { grid-template-columns: 1fr; }
+      }
+      .chart-card {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 1rem;
+        padding: 1.5rem;
+      }
+      .chart-card h2 {
+        font-size: 1.25rem;
+        color: #fff;
+        margin-bottom: 1rem;
+      }
+      .bar-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .bar-label {
+        width: 100px;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .bar-track {
+        flex: 1;
+        height: 1.5rem;
+        background: rgba(255,255,255,0.1);
+        border-radius: 0.5rem;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 0.5rem;
+        font-size: 0.75rem;
+        color: white;
+        font-weight: bold;
+      }
+      .bar-rate {
+        width: 50px;
+        text-align: right;
+        font-size: 0.75rem;
+        color: #94a3b8;
+      }
+      .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #94a3b8;
+      }
+      .error {
+        text-align: center;
+        padding: 2rem;
+        color: #ef4444;
+      }
+      .refresh-note {
+        text-align: center;
+        margin-top: 2rem;
+        font-size: 0.875rem;
+        color: #64748b;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <a href="/" class="logo">🛒 ShopDemo</a>
+        <div class="nav-links">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/products.html" class="nav-link">Products</a>
+          <a href="/about.html" class="nav-link">About</a>
+          <a href="/analytics.html" class="nav-link active">📊 Analytics</a>
+          <a href="/cart.html" class="nav-link cart-link">
+            🛒 Cart <span id="cart-count">0</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Dashboard -->
+    <main class="dashboard">
+      <div class="dashboard-header">
+        <h1>📊 AI Analytics Dashboard</h1>
+        <p>Real-time insights into AI intervention performance</p>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card">
+          <h3>Total Sessions</h3>
+          <div class="value" id="total-sessions">--</div>
+          <div class="subtitle">All-time visitors</div>
+        </div>
+        <div class="kpi-card purple">
+          <h3>Interventions Shown</h3>
+          <div class="value" id="total-interventions">--</div>
+          <div class="subtitle">AI popups triggered</div>
+        </div>
+        <div class="kpi-card green">
+          <h3>Discounts Claimed</h3>
+          <div class="value" id="total-claims">--</div>
+          <div class="subtitle" id="claim-rate">--% claim rate</div>
+        </div>
+        <div class="kpi-card orange">
+          <h3>Conversions</h3>
+          <div class="value" id="total-conversions">--</div>
+          <div class="subtitle" id="conversion-rate">--% conversion rate</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-section">
+        <div class="chart-card">
+          <h2>📈 Recent Interventions</h2>
+          <div id="timeseries-chart">
+            <div class="loading">Loading...</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h2>🔥 Top Pages by Views</h2>
+          <div id="pages-chart">
+            <div class="loading">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="refresh-note">
+        🔄 Auto-refreshes every 30 seconds | <span id="last-updated"></span>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>ShopDemo - OP-ECOM Analytics Demo</p>
+    </footer>
+
+    <script>
+      const API_BASE = 'http://localhost:8001';
+
+      async function fetchAnalytics() {
+        try {
+          // Fetch summary
+          const summaryRes = await fetch(`${API_BASE}/analytics/summary`);
+          if (summaryRes.ok) {
+            const summary = await summaryRes.json();
+            document.getElementById('total-sessions').textContent = summary.total_sessions.toLocaleString();
+            document.getElementById('total-interventions').textContent = summary.total_interventions.toLocaleString();
+            document.getElementById('total-claims').textContent = summary.total_claims.toLocaleString();
+            document.getElementById('total-conversions').textContent = summary.total_conversions.toLocaleString();
+            document.getElementById('claim-rate').textContent = `${summary.claim_rate}% claim rate`;
+            document.getElementById('conversion-rate').textContent = `${summary.conversion_rate}% conversion rate`;
+          }
+
+          // Fetch pages
+          const pagesRes = await fetch(`${API_BASE}/analytics/pages?limit=5`);
+          if (pagesRes.ok) {
+            const pages = await pagesRes.json();
+            const maxViews = Math.max(...pages.map(p => p.views), 1);
+            let pagesHtml = '';
+            pages.forEach(page => {
+              const width = (page.views / maxViews) * 100;
+              pagesHtml += `
+                <div class="bar-row">
+                  <div class="bar-label" title="${page.page_title}">${page.page_title || 'Unknown'}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: ${width}%">${page.views}</div>
+                  </div>
+                  <div class="bar-rate">${page.abandonment_rate}%</div>
+                </div>
+              `;
+            });
+            document.getElementById('pages-chart').innerHTML = pagesHtml || '<div class="loading">No data yet</div>';
+          }
+
+          // Fetch timeseries
+          const timeRes = await fetch(`${API_BASE}/analytics/interventions?hours=24`);
+          if (timeRes.ok) {
+            const timeseries = await timeRes.json();
+            const maxVal = Math.max(...timeseries.map(t => t.interventions), 1);
+            let timeHtml = '';
+            timeseries.slice(-6).forEach(point => {
+              const width = (point.interventions / maxVal) * 100;
+              const hour = point.timestamp.split(' ')[1] || point.timestamp;
+              timeHtml += `
+                <div class="bar-row">
+                  <div class="bar-label">${hour}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style="width: ${width}%">${point.interventions}</div>
+                  </div>
+                  <div class="bar-rate">${point.claims} 🎟️</div>
+                </div>
+              `;
+            });
+            document.getElementById('timeseries-chart').innerHTML = timeHtml || '<div class="loading">No data yet</div>';
+          }
+
+          document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+          console.error('Analytics fetch error:', err);
+        }
+      }
+
+      // Initial load
+      fetchAnalytics();
+      // Auto-refresh every 30 seconds
+      setInterval(fetchAnalytics, 30000);
+
+      // Update cart count
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      document.getElementById('cart-count').textContent = cart.length;
+    </script>
+  </body>
+</html>
