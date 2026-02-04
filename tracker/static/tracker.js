@@ -286,25 +286,25 @@
 
     // NEW: Proactive AI-based exit detection (replaces mouse-based detection)
     let aiPollInterval = null;
-    
+
     function setupProactiveAI() {
         // Start polling the AI every few seconds
         aiPollInterval = setInterval(async () => {
             if (!sessionId || exitIntentChecked) return;
-            
+
             // Make sure user has been on page for at least 3 seconds
             const dwellTime = (Date.now() - currentPageStart) / 1000;
             if (dwellTime < 3) return;
-            
+
             console.log('[OP-ECOM Tracker] AI Polling: Checking abandonment risk...');
-            
+
             const result = await sendToAPI('/tracker/check-intent', {
                 session_id: sessionId
             });
-            
+
             if (result && result.abandonment_prob) {
                 console.log(`[OP-ECOM Tracker] AI Prediction: ${(result.abandonment_prob * 100).toFixed(1)}% abandonment risk`);
-                
+
                 // If AI detects high abandonment risk, trigger intervention
                 if (result.abandonment_prob > AI_THRESHOLD && result.should_intervene) {
                     console.log('[OP-ECOM Tracker] AI DETECTED HIGH RISK - Triggering intervention!');
@@ -314,28 +314,16 @@
                 }
             }
         }, AI_POLL_INTERVAL);
-        
-        console.log(`[OP-ECOM Tracker] Proactive AI monitoring started (polling every ${AI_POLL_INTERVAL/1000}s)`);
-    }
-    
-    // LEGACY: Keep mouse-based detection as a backup trigger
-    function setupExitIntent() {
-        document.addEventListener('mouseleave', (e) => {
-            if (e.clientY < 50) { // Top of screen
-                checkExitIntent();
-            }
-        });
+
+        console.log(`[OP-ECOM Tracker] Proactive AI monitoring started (polling every ${AI_POLL_INTERVAL / 1000}s)`);
     }
 
     // Initialize
     async function init() {
         await startSession();
-        
-        // NEW: Start proactive AI-based detection
+
+        // Start proactive AI-based detection (pure AI, no mouse events)
         setupProactiveAI();
-        
-        // LEGACY: Keep mouse-based as backup
-        setupExitIntent();
 
         // Track page views on navigation
         window.addEventListener('beforeunload', () => {

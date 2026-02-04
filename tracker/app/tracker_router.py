@@ -23,13 +23,20 @@ from .schemas import (
 
 # Model paths
 PREDICTION_API_URL = "http://localhost:8000/predict"
-TRANSFORMER_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "backend", "models", "abandonment_model.onnx")
+# Use absolute path to avoid relative path issues
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "..", "backend", "models", "abandonment_model.onnx"))
 
 # Initialize Abandonment Model (Final choice: TCN for speed)
 abandonment_session = None
 try:
+    print(f"[DEBUG] Looking for model at: {TRANSFORMER_MODEL_PATH}")
     if os.path.exists(TRANSFORMER_MODEL_PATH):
-        abandonment_session = ort.InferenceSession(TRANSFORMER_MODEL_PATH)
+        # Change working directory temporarily to help ONNX find .data files
+        original_cwd = os.getcwd()
+        os.chdir(os.path.dirname(TRANSFORMER_MODEL_PATH))
+        abandonment_session = ort.InferenceSession(os.path.basename(TRANSFORMER_MODEL_PATH))
+        os.chdir(original_cwd)
         print(f"✅ Loaded Abandonment model from {TRANSFORMER_MODEL_PATH}")
     else:
         print(f"⚠️ Abandonment model not found at {TRANSFORMER_MODEL_PATH}")
@@ -217,13 +224,13 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         bounce_rate = bounce_count / total_pages
         exit_rate = exit_count / total_pages
         # 2. ==========================================
-    #    STEP 1: Run Abandonment Transformer (LSTM/Transformer)
+    #    STEP 1: Run Abandonment Model (TCN)
     #    This predicts if the user is ABOUT TO LEAVE.
     # ==========================================
     abandonment_prob = 0.5  # Default fallback
     
     if abandonment_session is not None and len(page_views) >= 1:
-        # Build sequence for Transformer
+        # Build sequence for TCN
         max_seq_len = 20
         page_ids = np.zeros((1, max_seq_len), dtype=np.int64)
         durations = np.zeros((1, max_seq_len), dtype=np.float32)
@@ -243,7 +250,7 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             logits = result[0][0][0]
             abandonment_prob = 1 / (1 + np.exp(-logits))
         except Exception as e:
-            print(f"Transformer inference error: {e}")
+            print(f"TCN inference error: {e}")
             abandonment_prob = 0.5
     
     # 3. ==========================================
@@ -289,10 +296,11 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     #      - AND User has seen at least 1 product
     # ==========================================
     seen_product = len(product_pages) > 0
+    # Dual-signal intervention: user must be leaving AND likely to buy
     should_intervene = (
-        abandonment_prob > 0.30 and 
-        purchase_prob > 0.01 and 
-        seen_product
+        abandonment_prob > 0.70 and   # User likely to leave (70%+)
+        purchase_prob > 0.05 and      # User likely to buy (5%+)
+        seen_product                   # User has viewed at least 1 product
     )
 
     
