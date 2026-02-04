@@ -68,7 +68,9 @@ class IntentCheckResponse(BaseModel):
     should_intervene: bool
     abandonment_prob: float = 0.0
     purchase_prob: float = 0.0
-    discount_percent: int = 20  # NEW: Personalized discount
+    discount_percent: int = 20
+    # XAI Explanation data (for admin dashboard)
+    xai_explanation: Optional[dict] = None
 
 # --- Email Capture Schemas ---
 class EmailCaptureRequest(BaseModel):

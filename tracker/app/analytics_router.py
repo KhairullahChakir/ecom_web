@@ -153,3 +153,75 @@ async def get_page_stats(
         ))
     
     return result
+
+
+# =====================
+# XAI Intervention Details
+# =====================
+
+class InterventionDetail(BaseModel):
+    id: int
+    session_id: str
+    timestamp: str
+    event_value: float
+    xai_data: Optional[dict] = None
+
+
+@router.get("/interventions/details", response_model=List[InterventionDetail])
+async def get_intervention_details(
+    limit: int = 20,
+    db: DBSession = Depends(get_db)
+):
+    """Get detailed intervention list with XAI explanations"""
+    
+    # Get recent exit_intent_shown events with their data
+    interventions = db.query(Event).filter(
+        Event.event_type == "exit_intent_shown"
+    ).order_by(desc(Event.created_at)).limit(limit).all()
+    
+    result = []
+    for event in interventions:
+        # Get session page view stats for XAI
+        page_views = db.query(PageView).filter(
+            PageView.session_id == event.session_id
+        ).all()
+        
+        total_duration = sum(pv.duration_seconds for pv in page_views)
+        product_pages = [p for p in page_views if p.page_type.name == 'ProductRelated']
+        cart_pages = [p for p in page_views if 'cart' in (p.page_url or '').lower()]
+        
+        # Build XAI explanation
+        xai_data = {
+            "pages_viewed": len(page_views),
+            "product_pages": len(product_pages),
+            "cart_pages": len(cart_pages),
+            "total_duration": f"{int(total_duration//60)}m {int(total_duration%60)}s",
+            "abandonment_score": f"{event.event_value}%",
+            "reasons": []
+        }
+        
+        # Generate reasons
+        if event.event_value >= 80:
+            xai_data["reasons"].append("Very high abandonment risk")
+        elif event.event_value >= 50:
+            xai_data["reasons"].append("Moderate abandonment risk")
+        
+        if len(product_pages) > 3:
+            xai_data["reasons"].append(f"Browsed {len(product_pages)} products")
+        if total_duration > 120:
+            xai_data["reasons"].append(f"Extended session duration")
+        if len(cart_pages) > 0:
+            xai_data["reasons"].append("Visited cart page")
+        
+        if not xai_data["reasons"]:
+            xai_data["reasons"].append("AI detected exit intent")
+        
+        result.append(InterventionDetail(
+            id=event.id,
+            session_id=event.session_id[:8] + "...",  # Truncate for display
+            timestamp=event.created_at.strftime("%H:%M:%S"),
+            event_value=event.event_value,
+            xai_data=xai_data
+        ))
+    
+    return result

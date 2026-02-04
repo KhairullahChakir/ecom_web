@@ -311,12 +311,43 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     # Calculate personalized discount based on cart value
     discount_percent = calculate_discount(request.cart_value)
     
+    # Generate XAI Explanation (for admin dashboard)
+    total_duration = sum(pv.duration_seconds for pv in page_views)
+    xai_explanation = None
+    if should_intervene:
+        # Build human-readable explanation
+        reasons = []
+        if abandonment_prob > 0.80:
+            reasons.append("Very high abandonment risk detected")
+        elif abandonment_prob > 0.50:
+            reasons.append("Moderate abandonment risk detected")
+        
+        if len(product_pages) > 3:
+            reasons.append(f"Browsed {len(product_pages)} products without purchasing")
+        if total_duration > 120:
+            reasons.append(f"Spent {int(total_duration//60)}m {int(total_duration%60)}s on site")
+        if request.cart_value > 100:
+            reasons.append(f"High cart value (${request.cart_value:.2f})")
+        
+        xai_explanation = {
+            "pages_viewed": len(page_views),
+            "product_pages": len(product_pages),
+            "cart_pages": len([p for p in page_views if 'cart' in (p.page_url or '').lower()]),
+            "total_duration_sec": round(total_duration, 1),
+            "cart_value": request.cart_value,
+            "abandonment_score": round(abandonment_prob * 100, 1),
+            "purchase_score": round(purchase_prob * 100, 1),
+            "reasons": reasons,
+            "decision": " | ".join(reasons) if reasons else "AI detected exit intent"
+        }
+    
     return IntentCheckResponse(
         probability=combined_prob,
         should_intervene=should_intervene,
         abandonment_prob=abandonment_prob,
         purchase_prob=purchase_prob,
-        discount_percent=discount_percent
+        discount_percent=discount_percent,
+        xai_explanation=xai_explanation
     )
 
 
