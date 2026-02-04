@@ -12,6 +12,8 @@
     // Configuration
     const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8001';
     const SESSION_KEY = 'op_ecom_session_id';
+    const AI_POLL_INTERVAL = 5000; // Check AI prediction every 5 seconds
+    const AI_THRESHOLD = 0.70; // Trigger popup when abandonment probability > 70%
 
     // State
     let sessionId = null;
@@ -203,10 +205,10 @@
     async function checkExitIntent() {
         if (!sessionId || exitIntentChecked) return;
 
-        // NEW: Avoid triggering if the user has been on the page for less than 3 seconds
+        // NEW: Avoid triggering if the user has been on the page for less than 0.5 seconds
         // This prevents immediate popups on refresh/landing
         const dwellTime = (Date.now() - currentPageStart) / 1000;
-        if (dwellTime < 3) {
+        if (dwellTime < 0.5) {
             console.log(`[OP-ECOM Tracker] Exit intent ignored: session too short (${dwellTime.toFixed(1)}s)`);
             return;
         }
@@ -282,6 +284,41 @@
         };
     }
 
+    // NEW: Proactive AI-based exit detection (replaces mouse-based detection)
+    let aiPollInterval = null;
+    
+    function setupProactiveAI() {
+        // Start polling the AI every few seconds
+        aiPollInterval = setInterval(async () => {
+            if (!sessionId || exitIntentChecked) return;
+            
+            // Make sure user has been on page for at least 3 seconds
+            const dwellTime = (Date.now() - currentPageStart) / 1000;
+            if (dwellTime < 3) return;
+            
+            console.log('[OP-ECOM Tracker] AI Polling: Checking abandonment risk...');
+            
+            const result = await sendToAPI('/tracker/check-intent', {
+                session_id: sessionId
+            });
+            
+            if (result && result.abandonment_prob) {
+                console.log(`[OP-ECOM Tracker] AI Prediction: ${(result.abandonment_prob * 100).toFixed(1)}% abandonment risk`);
+                
+                // If AI detects high abandonment risk, trigger intervention
+                if (result.abandonment_prob > AI_THRESHOLD && result.should_intervene) {
+                    console.log('[OP-ECOM Tracker] AI DETECTED HIGH RISK - Triggering intervention!');
+                    exitIntentChecked = true;
+                    clearInterval(aiPollInterval); // Stop polling after intervention
+                    showInterventionPopup(result.probability);
+                }
+            }
+        }, AI_POLL_INTERVAL);
+        
+        console.log(`[OP-ECOM Tracker] Proactive AI monitoring started (polling every ${AI_POLL_INTERVAL/1000}s)`);
+    }
+    
+    // LEGACY: Keep mouse-based detection as a backup trigger
     function setupExitIntent() {
         document.addEventListener('mouseleave', (e) => {
             if (e.clientY < 50) { // Top of screen
@@ -293,11 +330,17 @@
     // Initialize
     async function init() {
         await startSession();
+        
+        // NEW: Start proactive AI-based detection
+        setupProactiveAI();
+        
+        // LEGACY: Keep mouse-based as backup
         setupExitIntent();
 
         // Track page views on navigation
         window.addEventListener('beforeunload', () => {
             trackPageView();
+            if (aiPollInterval) clearInterval(aiPollInterval);
         });
 
         // Handle SPA navigation
@@ -315,7 +358,7 @@
         // End session on page close (modern)
         window.addEventListener('pagehide', endSession);
 
-        console.log('[OP-ECOM Tracker] Initialized. Move mouse to top to test Exit Intent.');
+        console.log('[OP-ECOM Tracker] Initialized with PROACTIVE AI detection. AI will predict abandonment automatically.');
     }
 
     // Expose global API

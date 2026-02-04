@@ -65,6 +65,8 @@ class IntentCheckRequest(BaseModel):
 class IntentCheckResponse(BaseModel):
     probability: float
     should_intervene: bool
+    abandonment_prob: float = 0.0  # NEW: For proactive AI detection
+    purchase_prob: float = 0.0     # NEW: For debugging/logging
 
 # --- Admin Schemas ---
 class SessionSummary(BaseModel):

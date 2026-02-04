@@ -252,8 +252,8 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     # ==========================================
     purchase_prob = 0.0
     
-    # Only call TabM if user is likely to leave (abandonment > 70%)
-    if abandonment_prob > 0.70:
+    # Only call TabM if user is likely to leave (abandonment > 30% for demo)
+    if abandonment_prob > 0.30:
         features = {
             "administrative": len(admin_pages),
             "administrative_duration": sum(p.duration_seconds for p in admin_pages),
@@ -290,8 +290,8 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     # ==========================================
     seen_product = len(product_pages) > 0
     should_intervene = (
-        abandonment_prob > 0.40 and 
-        purchase_prob > 0.05 and 
+        abandonment_prob > 0.30 and 
+        purchase_prob > 0.01 and 
         seen_product
     )
 
@@ -301,5 +301,7 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     
     return IntentCheckResponse(
         probability=combined_prob,
-        should_intervene=should_intervene
+        should_intervene=should_intervene,
+        abandonment_prob=abandonment_prob,  # NEW: For proactive AI detection
+        purchase_prob=purchase_prob          # NEW: For debugging/logging
     )
