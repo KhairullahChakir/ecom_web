@@ -72,3 +72,17 @@ class Event(Base):
     event_value = Column(Float, default=0.0)
     event_data = Column(JSON)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class EmailCapture(Base):
+    """Stores captured emails from exit-intent popups"""
+    __tablename__ = "email_captures"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(64), ForeignKey("sessions.session_id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    discount_code = Column(String(20), nullable=False)
+    discount_percent = Column(Integer, default=20)
+    cart_value = Column(Float, default=0.0)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())

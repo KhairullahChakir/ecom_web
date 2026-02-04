@@ -14,11 +14,12 @@ from sqlalchemy.orm import Session as DBSession
 from sqlalchemy import func
 
 from .database import get_db
-from .models import Session, PageView, Event, VisitorType, PageType
+from .models import Session, PageView, Event, EmailCapture, VisitorType, PageType
 from .schemas import (
     SessionStartRequest, SessionStartResponse, SessionEndRequest,
     PageViewRequest, EventRequest, PurchaseRequest,
-    IntentCheckRequest, IntentCheckResponse
+    IntentCheckRequest, IntentCheckResponse,
+    EmailCaptureRequest, EmailCaptureResponse
 )
 
 # Model paths
@@ -307,9 +308,81 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     # Return the combined probability (weighted average for display)
     combined_prob = (abandonment_prob * 0.4 + purchase_prob * 0.6) if should_intervene else purchase_prob
     
+    # Calculate personalized discount based on cart value
+    discount_percent = calculate_discount(request.cart_value)
+    
     return IntentCheckResponse(
         probability=combined_prob,
         should_intervene=should_intervene,
-        abandonment_prob=abandonment_prob,  # NEW: For proactive AI detection
-        purchase_prob=purchase_prob          # NEW: For debugging/logging
+        abandonment_prob=abandonment_prob,
+        purchase_prob=purchase_prob,
+        discount_percent=discount_percent
+    )
+
+
+# --- Smart Discount Calculation ---
+def calculate_discount(cart_value: float) -> int:
+    """
+    Calculate personalized discount based on cart value.
+    Higher cart = lower discount (they're likely to buy anyway)
+    Lower cart = higher discount (win them over)
+    """
+    if cart_value <= 50:
+        return 30  # Big discount for hesitant buyers
+    elif cart_value <= 150:
+        return 20  # Balanced incentive
+    else:
+        return 10  # Small nudge for high-value carts
+
+
+def generate_discount_code(discount_percent: int) -> str:
+    """Generate a unique discount code"""
+    import random
+    import string
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return f"SAVE{discount_percent}-{suffix}"
+
+
+# --- Email Capture Endpoint ---
+@router.post("/email-capture", response_model=EmailCaptureResponse)
+async def capture_email(request: EmailCaptureRequest, db: DBSession = Depends(get_db)):
+    """
+    Capture email and generate personalized discount code.
+    This is called when user enters email in the exit-intent popup.
+    """
+    # Verify session exists
+    session = db.query(Session).filter(Session.session_id == request.session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Calculate personalized discount
+    discount_percent = calculate_discount(request.cart_value)
+    discount_code = generate_discount_code(discount_percent)
+    
+    # Store email capture
+    email_capture = EmailCapture(
+        session_id=request.session_id,
+        email=request.email,
+        discount_code=discount_code,
+        discount_percent=discount_percent,
+        cart_value=request.cart_value
+    )
+    db.add(email_capture)
+    
+    # Also log as event for analytics
+    event = Event(
+        session_id=request.session_id,
+        event_type="email_captured",
+        event_category="conversion",
+        event_label=f"discount_{discount_percent}%",
+        event_value=request.cart_value
+    )
+    db.add(event)
+    db.commit()
+    
+    return EmailCaptureResponse(
+        success=True,
+        discount_code=discount_code,
+        discount_percent=discount_percent,
+        message=f"Your exclusive {discount_percent}% discount code!"
     )

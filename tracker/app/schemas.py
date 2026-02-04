@@ -61,12 +61,26 @@ class PurchaseRequest(BaseModel):
 
 class IntentCheckRequest(BaseModel):
     session_id: str
+    cart_value: float = 0.0  # NEW: For personalized discount calculation
 
 class IntentCheckResponse(BaseModel):
     probability: float
     should_intervene: bool
-    abandonment_prob: float = 0.0  # NEW: For proactive AI detection
-    purchase_prob: float = 0.0     # NEW: For debugging/logging
+    abandonment_prob: float = 0.0
+    purchase_prob: float = 0.0
+    discount_percent: int = 20  # NEW: Personalized discount
+
+# --- Email Capture Schemas ---
+class EmailCaptureRequest(BaseModel):
+    session_id: str
+    email: str
+    cart_value: float = 0.0
+
+class EmailCaptureResponse(BaseModel):
+    success: bool
+    discount_code: str
+    discount_percent: int
+    message: str = "Your exclusive discount code!"
 
 # --- Admin Schemas ---
 class SessionSummary(BaseModel):

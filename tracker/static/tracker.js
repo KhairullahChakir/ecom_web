@@ -229,7 +229,11 @@
         }
     }
 
-    function showInterventionPopup(probability) {
+    function showInterventionPopup(probability, discountPercent) {
+        // Get cart value for personalized discount
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        const cartValue = cart.reduce((sum, item) => sum + (item.price || 0), 0);
+
         // Create popup elements
         const overlay = document.createElement('div');
         overlay.id = 'op-ecom-overlay';
@@ -246,38 +250,77 @@
             fontFamily: "'Segoe UI', sans-serif"
         });
 
-        const percent = Math.round(probability * 100);
+        // Step 1: Email capture form
         popup.innerHTML = `
             <div style="font-size: 3rem; margin-bottom: 1rem;">🎁</div>
             <h2 style="color: #1E4FA8; margin-bottom: 0.5rem;">Wait! Don't Go!</h2>
             <p style="color: #666; margin-bottom: 1.5rem;">
-                We see you're interested! Here is a special discount just for you.
+                Enter your email to unlock an <strong>exclusive discount</strong> just for you!
             </p>
-            <div style="background: #eef2ff; padding: 10px; border-radius: 8px; margin-bottom: 1.5rem;">
-                <code style="font-size: 1.5rem; color: #1E4FA8; font-weight: bold;">OP-ECOM-${percent}</code>
-            </div>
-            <button id="op-ecom-claim" style="
+            <input type="email" id="op-ecom-email" placeholder="your@email.com" style="
+                width: 100%; padding: 12px; font-size: 1rem; border: 2px solid #ddd;
+                border-radius: 8px; margin-bottom: 1rem; box-sizing: border-box;
+            " />
+            <button id="op-ecom-submit" style="
                 background: #1E4FA8; color: white; border: none; padding: 12px 24px;
                 font-size: 1.1rem; border-radius: 8px; cursor: pointer; width: 100%;
                 transition: transform 0.2s;"
-            >Claim Discount</button>
+            >Get My Discount</button>
             <button id="op-ecom-close" style="
                 background: transparent; border: none; color: #999; margin-top: 1rem;
                 cursor: pointer; text-decoration: underline;"
             >No thanks, I'll pay full price</button>
-            <div style="margin-top: 1rem; font-size: 0.8rem; color: #ccc;">
-                AI Confidence: ${percent}%
-            </div>
         `;
 
         overlay.appendChild(popup);
         document.body.appendChild(overlay);
 
-        // Handlers
-        document.getElementById('op-ecom-claim').onclick = () => {
-            trackEvent('click', 'intervention', 'claim_discount', percent);
-            overlay.remove();
+        // Handle email submission
+        document.getElementById('op-ecom-submit').onclick = async () => {
+            const emailInput = document.getElementById('op-ecom-email');
+            const email = emailInput.value.trim();
+
+            if (!email || !email.includes('@')) {
+                emailInput.style.borderColor = 'red';
+                return;
+            }
+
+            // Call email-capture API
+            const result = await sendToAPI('/tracker/email-capture', {
+                session_id: sessionId,
+                email: email,
+                cart_value: cartValue
+            });
+
+            if (result && result.success) {
+                // Step 2: Show discount code
+                popup.innerHTML = `
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                    <h2 style="color: #10b981; margin-bottom: 0.5rem;">Your Exclusive Discount!</h2>
+                    <p style="color: #666; margin-bottom: 1.5rem;">
+                        Here's your <strong>${result.discount_percent}% OFF</strong> code:
+                    </p>
+                    <div style="background: #eef2ff; padding: 15px; border-radius: 8px; margin-bottom: 1.5rem;">
+                        <code style="font-size: 1.5rem; color: #1E4FA8; font-weight: bold; user-select: all;">
+                            ${result.discount_code}
+                        </code>
+                    </div>
+                    <p style="color: #999; font-size: 0.85rem; margin-bottom: 1.5rem;">
+                        Valid for 24 hours • We've also sent it to ${email}
+                    </p>
+                    <button id="op-ecom-done" style="
+                        background: #10b981; color: white; border: none; padding: 12px 24px;
+                        font-size: 1.1rem; border-radius: 8px; cursor: pointer; width: 100%;"
+                    >Continue Shopping</button>
+                `;
+
+                document.getElementById('op-ecom-done').onclick = () => {
+                    trackEvent('click', 'intervention', 'claim_discount', result.discount_percent);
+                    overlay.remove();
+                };
+            }
         };
+
         document.getElementById('op-ecom-close').onclick = () => {
             trackEvent('click', 'intervention', 'dismiss', 0);
             overlay.remove();
