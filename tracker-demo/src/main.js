@@ -89,19 +89,26 @@ function renderCart() {
 }
 
 // Complete purchase
-function completePurchase() {
+async function completePurchase() {
   const total = getCartTotal();
 
   // Track purchase with tracker
   if (window.opEcomTracker) {
-    window.opEcomTracker.trackPurchase(total);
+    try {
+      await window.opEcomTracker.trackPurchase(total);
+    } catch (err) {
+      console.error('Tracking failed', err);
+    }
   }
 
   // Clear cart
   clearCart();
 
-  // Redirect to success page
-  window.location.href = '/success.html';
+  console.log('Purchase flow complete. Redirecting...');
+  // Small delay to ensure all state is synced
+  setTimeout(() => {
+    window.location.href = '/success.html';
+  }, 500);
 }
 
 // Product data

@@ -190,11 +190,18 @@ async def get_intervention_details(
         product_pages = [p for p in page_views if p.page_type.name == 'ProductRelated']
         cart_pages = [p for p in page_views if 'cart' in (p.page_url or '').lower()]
         
+        # Check for add_to_cart events
+        cart_events = db.query(Event).filter(
+            Event.session_id == event.session_id,
+            Event.event_type == "add_to_cart"
+        ).all()
+        
         # Build XAI explanation
         xai_data = {
             "pages_viewed": len(page_views),
             "product_pages": len(product_pages),
             "cart_pages": len(cart_pages),
+            "cart_items": len(cart_events),
             "total_duration": f"{int(total_duration//60)}m {int(total_duration%60)}s",
             "abandonment_score": f"{event.event_value}%",
             "reasons": []
@@ -206,6 +213,8 @@ async def get_intervention_details(
         elif event.event_value >= 50:
             xai_data["reasons"].append("Moderate abandonment risk")
         
+        if len(cart_events) > 0:
+            xai_data["reasons"].append(f"Added {len(cart_events)} items to cart")
         if len(product_pages) > 3:
             xai_data["reasons"].append(f"Browsed {len(product_pages)} products")
         if total_duration > 120:

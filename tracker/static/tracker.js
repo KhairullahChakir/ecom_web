@@ -13,7 +13,7 @@
     const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8001';
     const SESSION_KEY = 'op_ecom_session_id';
     const AI_POLL_INTERVAL = 5000; // Check AI prediction every 5 seconds
-    const AI_THRESHOLD = 0.70; // Trigger popup when abandonment probability > 70%
+    const AI_THRESHOLD = 0.60; // Trigger popup when abandonment probability > 60% (balanced)
 
     // State
     let sessionId = null;
@@ -52,6 +52,10 @@
 
     function getPageType() {
         const path = window.location.pathname.toLowerCase();
+        // Specifically detect home page
+        if (path === '/' || path === '' || path.includes('index.html')) {
+            return 'Home';
+        }
         if (path.includes('account') || path.includes('cart') || path.includes('checkout') || path.includes('settings')) {
             return 'Administrative';
         }
@@ -106,8 +110,8 @@
 
     // Session Management
     async function startSession() {
-        // Check for existing session
-        const existingSession = sessionStorage.getItem(SESSION_KEY);
+        // Check for existing session (localStorage for cross-tab persistence)
+        const existingSession = localStorage.getItem(SESSION_KEY);
         if (existingSession) {
             sessionId = existingSession;
             console.log('[OP-ECOM Tracker] Resuming session:', sessionId);
@@ -128,7 +132,7 @@
 
         if (result?.session_id) {
             sessionId = result.session_id;
-            sessionStorage.setItem(SESSION_KEY, sessionId);
+            localStorage.setItem(SESSION_KEY, sessionId);
             console.log('[OP-ECOM Tracker] Session started:', sessionId);
         }
     }
@@ -143,7 +147,7 @@
             session_id: sessionId
         });
 
-        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_KEY);
         console.log('[OP-ECOM Tracker] Session ended:', sessionId);
     }
 
@@ -189,7 +193,7 @@
             order_value: orderValue || 0
         });
 
-        console.log('[OP-ECOM Tracker] Purchase tracked!');
+        console.log('[OP-ECOM Tracker] Purchase tracked! Session:', sessionId, 'Value:', orderValue);
     }
 
     // Page Navigation Handling
@@ -318,7 +322,7 @@
                 `;
 
                 document.getElementById('op-ecom-done').onclick = () => {
-                    trackEvent('click', 'intervention', 'claim_discount', result.discount_percent);
+                    trackEvent('discount_claimed', 'intervention', 'claim_discount', result.discount_percent);
                     overlay.remove();
                 };
             }

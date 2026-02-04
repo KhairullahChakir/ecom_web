@@ -26,7 +26,7 @@ from .schemas import (
 PREDICTION_API_URL = "http://localhost:8000/predict"
 # Use absolute path to avoid relative path issues
 _base_dir = os.path.dirname(os.path.abspath(__file__))
-TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "..", "backend", "models", "abandonment_model.onnx"))
+TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "models", "tcn_real.onnx"))
 
 # Initialize Abandonment Model (Final choice: TCN for speed)
 abandonment_session = None
@@ -225,21 +225,25 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         exit_count = sum(1 for p in page_views if p.is_exit)
         bounce_rate = bounce_count / total_pages
         exit_rate = exit_count / total_pages
-        # 2. ==========================================
-    #    STEP 1: Run Abandonment Model (TCN)
+    # ==========================================
+    #    STEP 1: Predict abandonment risk (TCN)
     #    This predicts if the user is ABOUT TO LEAVE.
     # ==========================================
     abandonment_prob = 0.5  # Default fallback
     
-    if abandonment_session is not None and len(page_views) >= 1:
+    # Use a sliding window of the LAST 20 pages for TCN
+    max_seq_len = 20
+    recent_pvs = page_views[-max_seq_len:]
+    
+    if abandonment_session is not None and len(recent_pvs) >= 1:
         # Build sequence for TCN
-        max_seq_len = 20
         page_ids = np.zeros((1, max_seq_len), dtype=np.int64)
         durations = np.zeros((1, max_seq_len), dtype=np.float32)
         
-        for i, pv in enumerate(page_views[:max_seq_len]):
+        for i, pv in enumerate(recent_pvs):
+            # Page type mapping
             page_type_name = pv.page_type.name if hasattr(pv.page_type, 'name') else str(pv.page_type)
-            page_ids[0, i] = PAGE_TYPE_TO_IDX.get(page_type_name, 2)  # Default to Product
+            page_ids[0, i] = PAGE_TYPE_TO_IDX.get(page_type_name, 1)  # Default to Product
             durations[0, i] = min(pv.duration_seconds, 180.0) / 180.0  # Normalize
         
         # Run inference
@@ -250,7 +254,7 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             })
             # Apply sigmoid to logits
             logits = result[0][0][0]
-            abandonment_prob = 1 / (1 + np.exp(-logits))
+            abandonment_prob = 1 / (1 + np.exp(-float(logits)))
         except Exception as e:
             print(f"TCN inference error: {e}")
             abandonment_prob = 0.5
@@ -290,26 +294,21 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         except Exception:
             purchase_prob = 0.0
 
-    # 4. ==========================================
-    #    DECISION LOGIC: Dual-Signal Intervention
-    #    Intervene if:
-    #      - User is likely to LEAVE (abandonment > 40%)
-    #      - AND User is likely to BUY (purchase > 5%)
-    #      - AND User has seen at least 1 product
-    # ==========================================
-    seen_product = len(product_pages) > 0
-    # TESTING: Simplified logic - only check abandonment
-    should_intervene = (
-        abandonment_prob > 0.40 and   # Lower threshold for testing (40%)
-        seen_product                   # User has viewed at least 1 product
-    )
-
+    # FINAL AI DECISION: Pure abandonment probability check
+    # AI decides when it's > 70% certain the user is leaving.
+    should_intervene = abandonment_prob > 0.70
     
-    # Return the combined probability (weighted average for display)
-    combined_prob = (abandonment_prob * 0.4 + purchase_prob * 0.6) if should_intervene else purchase_prob
+    # Return the direct abandonment score for dashboard visibility
+    combined_prob = abandonment_prob if should_intervene else purchase_prob
     
     # Calculate personalized discount based on cart value
     discount_percent = calculate_discount(request.cart_value)
+    
+    # Check for add_to_cart events in this session
+    cart_events = db.query(Event).filter(
+        Event.session_id == request.session_id,
+        Event.event_type == "add_to_cart"
+    ).all()
     
     # Generate XAI Explanation (for admin dashboard)
     total_duration = sum(pv.duration_seconds for pv in page_views)
@@ -322,8 +321,10 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         elif abandonment_prob > 0.50:
             reasons.append("Moderate abandonment risk detected")
         
+        if len(cart_events) > 0:
+            reasons.append(f"Added {len(cart_events)} items to cart but didn't checkout")
         if len(product_pages) > 3:
-            reasons.append(f"Browsed {len(product_pages)} products without purchasing")
+            reasons.append(f"Browsed {len(product_pages)} products")
         if total_duration > 120:
             reasons.append(f"Spent {int(total_duration//60)}m {int(total_duration%60)}s on site")
         if request.cart_value > 100:
@@ -333,6 +334,7 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             "pages_viewed": len(page_views),
             "product_pages": len(product_pages),
             "cart_pages": len([p for p in page_views if 'cart' in (p.page_url or '').lower()]),
+            "cart_items": len(cart_events),
             "total_duration_sec": round(total_duration, 1),
             "cart_value": request.cart_value,
             "abandonment_score": round(abandonment_prob * 100, 1),

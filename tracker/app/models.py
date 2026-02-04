@@ -14,6 +14,7 @@ class VisitorType(str, enum.Enum):
     Other = "Other"
 
 class PageType(str, enum.Enum):
+    Home = "Home"
     Administrative = "Administrative"
     Informational = "Informational"
     ProductRelated = "ProductRelated"
