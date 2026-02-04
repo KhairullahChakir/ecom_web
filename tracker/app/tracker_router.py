@@ -342,10 +342,10 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
         }
     
     return IntentCheckResponse(
-        probability=combined_prob,
+        probability=float(combined_prob),
         should_intervene=should_intervene,
-        abandonment_prob=abandonment_prob,
-        purchase_prob=purchase_prob,
+        abandonment_prob=float(abandonment_prob),
+        purchase_prob=float(purchase_prob),
         discount_percent=discount_percent,
         xai_explanation=xai_explanation
     )
