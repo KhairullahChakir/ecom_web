@@ -1,27 +1,12 @@
 {
-  "model_name": "TabM (Ensemble=4)",
-  "split_protocol": "70/10/20 Stratified, Seed 42",
-  "advanced_metrics": {
-    "roc_auc": 0.8914944076534254,
-    "pr_auc": 0.6762655703235695,
-    "brier_score": 0.08016891523653069,
-    "precision_at_5pct": 0.8861788617886179,
-    "precision_at_10pct": 0.7398373983739838,
-    "f1": 0.6028985507246377
+  "metrics": {
+    "roc_auc": 0.9041701419943524,
+    "pr_auc": 0.6706139325117282,
+    "brier_score": 0.08032241565242619,
+    "precision_at_5pct": 0.8373983739837398
   },
-  "latency_stats": {
-    "preprocessing": {
-      "mean": 1.3014475263613114,
-      "p95": 2.499574999944798
-    },
-    "inference": {
-      "mean": 0.31195154095607014,
-      "p95": 0.7105000000819928
-    }
-  },
-  "environment": {
-    "engine": "ONNX Runtime v1.16+",
-    "threads_intra": 1,
-    "split": "Train: 6904 | Val: 986 | Test: 2466"
+  "latency": {
+    "avg_inference_ms": 0.0937742903413785,
+    "p95_inference_ms": 0.14252500000111468
   }
 }
