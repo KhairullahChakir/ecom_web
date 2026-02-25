@@ -113,12 +113,12 @@ async function completePurchase() {
 
 // Product data
 const products = {
-  1: { id: 1, name: 'Running Shoes', price: 99.99, emoji: '👟', pageValue: 25 },
-  2: { id: 2, name: 'Wireless Headphones', price: 149.99, emoji: '🎧', pageValue: 35 },
-  3: { id: 3, name: 'Smart Watch', price: 299.99, emoji: '⌚', pageValue: 50 },
-  4: { id: 4, name: 'Laptop Bag', price: 79.99, emoji: '💼', pageValue: 20 },
-  5: { id: 5, name: 'Bluetooth Speaker', price: 129.99, emoji: '🔊', pageValue: 30 },
-  6: { id: 6, name: 'Fitness Tracker', price: 89.99, emoji: '📱', pageValue: 28 }
+  1: { id: 1, name: 'Running Shoes', price: 99.99, emoji: '👟' },
+  2: { id: 2, name: 'Wireless Headphones', price: 149.99, emoji: '🎧' },
+  3: { id: 3, name: 'Smart Watch', price: 299.99, emoji: '⌚' },
+  4: { id: 4, name: 'Laptop Bag', price: 79.99, emoji: '💼' },
+  5: { id: 5, name: 'Bluetooth Speaker', price: 129.99, emoji: '🔊' },
+  6: { id: 6, name: 'Fitness Tracker', price: 89.99, emoji: '📱' }
 };
 
 // Get product by ID

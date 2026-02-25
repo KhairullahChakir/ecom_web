@@ -66,31 +66,10 @@
     }
 
     function getPageValue() {
-        // 1. Check if we are on the Cart page (High Intent)
-        if (window.location.pathname.includes('cart.html')) {
-            return 20.0; // High value for being in the cart
-        }
-
-        // 2. Check for product detail page container
-        const detailContainer = document.getElementById('product-detail');
-        if (detailContainer && detailContainer.getAttribute('data-page-value')) {
-            const val = parseFloat(detailContainer.getAttribute('data-page-value'));
-            console.log(`[OP-ECOM Tracker] Found Detail PageValue: ${val}`);
-            return val;
-        }
-
-        // 2. Try to find the first product card in view or any card with value
-        const cards = document.querySelectorAll('[data-page-value]');
-        if (cards.length > 0) {
-            // If many cards (like grid), taking an average or the first one
-            // In UCI, it's the value of the page. Grid page usually has 0 value in UCI,
-            // but for demo we can assign it the avg of products on it.
-            let sum = 0;
-            cards.forEach(c => sum += parseFloat(c.getAttribute('data-page-value') || 0));
-            const avg = sum / cards.length;
-            console.log(`[OP-ECOM Tracker] Found Grid Avg PageValue: ${avg}`);
-            return avg;
-        }
+        // Page values are now calculated DYNAMICALLY by the backend
+        // from real conversion data (like Google Analytics methodology).
+        // Frontend always sends 0; the backend computes the real value
+        // based on: total_revenue / total_pageviews from converted sessions.
         return 0;
     }
 
@@ -341,6 +320,17 @@
         // Start polling the AI every few seconds
         aiPollInterval = setInterval(async () => {
             if (!sessionId || exitIntentChecked) return;
+
+            // SMART PAGE FILTER: Never show popup on high-intent pages!
+            // Users on checkout/cart/success are ALREADY buying — don't give them a discount!
+            const path = window.location.pathname.toLowerCase();
+            const isHighIntentPage = path.includes('checkout') ||
+                path.includes('cart') ||
+                path.includes('success');
+            if (isHighIntentPage) {
+                console.log('[OP-ECOM Tracker] AI Polling: Skipped — user is on high-intent page (buying!)');
+                return;
+            }
 
             // Make sure user has been on page for at least 3 seconds
             const dwellTime = (Date.now() - currentPageStart) / 1000;

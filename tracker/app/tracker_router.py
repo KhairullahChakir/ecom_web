@@ -38,11 +38,11 @@ try:
         os.chdir(os.path.dirname(TRANSFORMER_MODEL_PATH))
         abandonment_session = ort.InferenceSession(os.path.basename(TRANSFORMER_MODEL_PATH))
         os.chdir(original_cwd)
-        print(f"✅ Loaded Abandonment model from {TRANSFORMER_MODEL_PATH}")
+        print(f"[OK] Loaded Abandonment model from {TRANSFORMER_MODEL_PATH}")
     else:
-        print(f"⚠️ Abandonment model not found at {TRANSFORMER_MODEL_PATH}")
+        print(f"[WARN] Abandonment model not found at {TRANSFORMER_MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ Failed to load Abandonment model: {e}")
+    print(f"[WARN] Failed to load Abandonment model: {e}")
 
 # Page type mapping for TCN input (model was trained with num_page_types=4)
 # All indices must be in range [0, 3]
@@ -217,7 +217,45 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
     total_pages = len(page_views)
     bounce_rate = 0.0
     exit_rate = 0.0
+    
+    # ==========================================
+    #    DYNAMIC PAGE VALUE CALCULATION
+    #    Mirrors Google Analytics methodology:
+    #    PageValue = Revenue from converted sessions / Total page views
+    #    This is the #1 most important feature for the TabM model.
+    # ==========================================
     avg_page_value = 0.0
+    try:
+        # Find all sessions that ended with a purchase (revenue=True)
+        converted_sessions = db.query(Session).filter(Session.revenue == True).all()
+        if converted_sessions:
+            total_revenue = sum(s.order_value or 0 for s in converted_sessions)
+            # Count total page views across all converted sessions
+            converted_ids = [s.session_id for s in converted_sessions]
+            total_converted_pvs = db.query(PageView).filter(
+                PageView.session_id.in_(converted_ids)
+            ).count()
+            
+            if total_converted_pvs > 0:
+                global_page_value = total_revenue / total_converted_pvs
+                
+                # For THIS session: page_value = global_page_value * (pages matching converted patterns)
+                # Check how many of the current session's pages are similar to converted sessions' pages
+                current_page_types = set(p.page_type for p in page_views)
+                converted_pvs = db.query(PageView).filter(
+                    PageView.session_id.in_(converted_ids)
+                ).all()
+                converted_page_types = set(p.page_type for p in converted_pvs)
+                
+                # Overlap: how many page types in this session also appear in purchase sessions
+                overlap = len(current_page_types & converted_page_types)
+                total_types = len(current_page_types) if current_page_types else 1
+                similarity = overlap / total_types
+                
+                avg_page_value = global_page_value * similarity
+    except Exception as e:
+        print(f"[WARN] Dynamic page value calculation error: {e}")
+        avg_page_value = 0.0
     
     if total_pages > 0:
         bounce_count = sum(1 for p in page_views if p.is_bounce)
