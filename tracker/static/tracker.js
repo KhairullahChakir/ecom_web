@@ -10,15 +10,109 @@
     'use strict';
 
     // Configuration
-    const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8001';
+    const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8002';
     const SESSION_KEY = 'op_ecom_session_id';
-    const AI_POLL_INTERVAL = 5000; // Check AI prediction every 5 seconds
-    const AI_THRESHOLD = 0.60; // Trigger popup when abandonment probability > 60% (balanced)
+    const AI_POLL_INTERVAL = 3000; // Check local AI every 3 seconds
+    const AI_THRESHOLD = 0.60;
+    const MODEL_URL = `${API_URL}/tracker/models/tcn_real_standalone.onnx`;
 
     // State
     let sessionId = null;
     let currentPageStart = Date.now();
     let currentPageUrl = window.location.href;
+    let pageHistory = JSON.parse(localStorage.getItem('op_ecom_history') || '[]');
+    let ortSession = null;
+    let exitIntentChecked = false;
+
+    // Page type to index mapping (must match backend)
+    const PAGE_TYPE_TO_IDX = {
+        'Home': 0, 'Product': 1, 'ProductDetail': 1, 'Cart': 2,
+        'Checkout': 2, 'About': 3, 'Account': 3,
+        'Administrative': 2, 'Informational': 3, 'ProductRelated': 1
+    };
+
+    // Load ONNX Runtime Web
+    async function loadONNX() {
+        if (window.ort) return true;
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js';
+            script.onload = () => {
+                console.log('[OP-ECOM Tracker] ONNX Runtime loaded');
+                resolve(true);
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function initModel() {
+        try {
+            await loadONNX();
+            ortSession = await ort.InferenceSession.create(MODEL_URL);
+            console.log('[OP-ECOM Tracker] Edge AI Engine Initialized (Local Inference)');
+        } catch (e) {
+            console.error('[OP-ECOM Tracker] Failed to load local AI model:', e);
+        }
+    }
+
+    function updatePageHistory() {
+        const duration = (Date.now() - currentPageStart) / 1000;
+        const entry = {
+            type: getPageType(),
+            duration: Math.min(duration, 180)
+        };
+        pageHistory.push(entry);
+        if (pageHistory.length > 20) pageHistory.shift();
+        localStorage.setItem('op_ecom_history', JSON.stringify(pageHistory));
+    }
+
+    async function runLocalInference() {
+        if (!ortSession || exitIntentChecked) return;
+
+        // Skip high intent pages
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes('checkout') || path.includes('cart') || path.includes('success')) return;
+
+        // Ensure we have some history
+        if (pageHistory.length === 0) return;
+
+        try {
+            // Prepare inputs
+            const maxSeqLen = 20;
+            const pageIdsSet = new BigInt64Array(maxSeqLen).fill(0n);
+            const durationsSet = new Float32Array(maxSeqLen).fill(0.0);
+
+            // Fill with history
+            pageHistory.slice(-maxSeqLen).forEach((pv, i) => {
+                pageIdsSet[i] = BigInt(PAGE_TYPE_TO_IDX[pv.type] || 1);
+                durationsSet[i] = pv.duration / 180.0;
+            });
+
+            // Create tensors
+            const pageIdsTensor = new ort.Tensor('int64', pageIdsSet, [1, maxSeqLen]);
+            const durationsTensor = new ort.Tensor('float32', durationsSet, [1, maxSeqLen]);
+
+            // Run session
+            const results = await ortSession.run({
+                'page_ids': pageIdsTensor,
+                'durations': durationsTensor
+            });
+
+            // Sigmoid on output
+            const logits = results[Object.keys(results)[0]].data[0];
+            const prob = 1 / (1 + Math.exp(-logits));
+
+            console.log(`[OP-ECOM Tracker] Local AI Prediction: ${(prob * 100).toFixed(1)}% abandonment risk`);
+
+            if (prob > AI_THRESHOLD) {
+                console.log('[OP-ECOM Tracker] LOCAL AI DETECTED HIGH RISK - Triggering intervention!');
+                exitIntentChecked = true;
+                showInterventionPopup(prob);
+            }
+        } catch (e) {
+            console.warn('[OP-ECOM Tracker] Local inference failed:', e);
+        }
+    }
 
     // Utility functions
     function generateUUID() {
@@ -52,26 +146,13 @@
 
     function getPageType() {
         const path = window.location.pathname.toLowerCase();
-        // Specifically detect home page
-        if (path === '/' || path === '' || path.includes('index.html')) {
-            return 'Home';
-        }
-        if (path.includes('account') || path.includes('cart') || path.includes('checkout') || path.includes('settings')) {
-            return 'Administrative';
-        }
-        if (path.includes('about') || path.includes('contact') || path.includes('faq') || path.includes('help')) {
-            return 'Informational';
-        }
+        if (path === '/' || path === '' || path.includes('index.html')) return 'Home';
+        if (path.includes('account') || path.includes('cart') || path.includes('checkout') || path.includes('settings')) return 'Administrative';
+        if (path.includes('about') || path.includes('contact') || path.includes('faq') || path.includes('help')) return 'Informational';
         return 'ProductRelated';
     }
 
-    function getPageValue() {
-        // Page values are now calculated DYNAMICALLY by the backend
-        // from real conversion data (like Google Analytics methodology).
-        // Frontend always sends 0; the backend computes the real value
-        // based on: total_revenue / total_pageviews from converted sessions.
-        return 0;
-    }
+    function getPageValue() { return 0; }
 
     async function sendToAPI(endpoint, data) {
         try {
@@ -89,7 +170,6 @@
 
     // Session Management
     async function startSession() {
-        // Check for existing session (localStorage for cross-tab persistence)
         const existingSession = localStorage.getItem(SESSION_KEY);
         if (existingSession) {
             sessionId = existingSession;
@@ -97,7 +177,6 @@
             return;
         }
 
-        // Start new session
         const visitorType = localStorage.getItem('op_ecom_returning') ? 'Returning_Visitor' : 'New_Visitor';
         localStorage.setItem('op_ecom_returning', 'true');
 
@@ -118,24 +197,15 @@
 
     async function endSession() {
         if (!sessionId) return;
-
-        // Track final page duration
         await trackPageView();
-
-        await sendToAPI('/tracker/session/end', {
-            session_id: sessionId
-        });
-
+        await sendToAPI('/tracker/session/end', { session_id: sessionId });
         localStorage.removeItem(SESSION_KEY);
-        console.log('[OP-ECOM Tracker] Session ended:', sessionId);
     }
 
     // Page View Tracking
     async function trackPageView() {
         if (!sessionId) return;
-
         const duration = (Date.now() - currentPageStart) / 1000;
-
         await sendToAPI('/tracker/pageview', {
             session_id: sessionId,
             page_type: getPageType(),
@@ -152,7 +222,6 @@
     // Event Tracking
     async function trackEvent(eventType, eventCategory, eventLabel, eventValue, eventData) {
         if (!sessionId) return;
-
         await sendToAPI('/tracker/event', {
             session_id: sessionId,
             event_type: eventType,
@@ -166,61 +235,27 @@
     // Purchase Tracking
     async function trackPurchase(orderValue) {
         if (!sessionId) return;
-
-        await sendToAPI('/tracker/purchase', {
-            session_id: sessionId,
-            order_value: orderValue || 0
-        });
-
-        console.log('[OP-ECOM Tracker] Purchase tracked! Session:', sessionId, 'Value:', orderValue);
+        await sendToAPI('/tracker/purchase', { session_id: sessionId, order_value: orderValue || 0 });
     }
 
     // Page Navigation Handling
     function handlePageChange() {
+        updatePageHistory();
         trackPageView();
         currentPageStart = Date.now();
         currentPageUrl = window.location.href;
     }
 
-    // Exit Intent & Intervention
-    let exitIntentChecked = false;
-
     async function checkExitIntent() {
-        if (!sessionId || exitIntentChecked) return;
-
-        // NEW: Avoid triggering if the user has been on the page for less than 0.5 seconds
-        // This prevents immediate popups on refresh/landing
-        const dwellTime = (Date.now() - currentPageStart) / 1000;
-        if (dwellTime < 0.5) {
-            console.log(`[OP-ECOM Tracker] Exit intent ignored: session too short (${dwellTime.toFixed(1)}s)`);
-            return;
-        }
-
-        exitIntentChecked = true; // Check only once per session/page load to avoid spam
-
-        console.log('[OP-ECOM Tracker] Checking exit intent...');
-        const result = await sendToAPI('/tracker/check-intent', {
-            session_id: sessionId
-        });
-
-        console.log('[OP-ECOM Tracker] Intent Result:', result);
-
-        if (result && result.should_intervene) {
-            showInterventionPopup(result.probability);
-        } else {
-            console.log('[OP-ECOM Tracker] Probability too low for intervention:', result?.probability);
-        }
+        // Manual check still uses local inference
+        await runLocalInference();
     }
 
-    function showInterventionPopup(probability, discountPercent) {
-        // Track that popup was shown (event_type must match analytics query)
+    function showInterventionPopup(probability) {
         trackEvent('exit_intent_shown', 'intervention', 'popup_displayed', Math.round(probability * 100));
-
-        // Get cart value for personalized discount
         const cart = JSON.parse(localStorage.getItem('shopDemo_cart') || '[]');
         const cartValue = cart.reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 1)), 0);
 
-        // Create popup elements
         const overlay = document.createElement('div');
         overlay.id = 'op-ecom-overlay';
         Object.assign(overlay.style, {
@@ -230,7 +265,6 @@
             animation: 'opFadeIn 0.3s ease'
         });
 
-        // Add animation keyframes
         if (!document.getElementById('op-ecom-animations')) {
             const style = document.createElement('style');
             style.id = 'op-ecom-animations';
@@ -251,12 +285,11 @@
             animation: 'opSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)'
         });
 
-        // Step 1: Email capture form
         popup.innerHTML = `
             <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎁</div>
-            <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;">Wait! Don't Leave Empty-Handed</h2>
-            <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;line-height:1.6;">
-                Enter your email to unlock an <strong style="color:#fff;">exclusive discount</strong> just for you!
+            <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Wait! Edge AI Offer</h2>
+            <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;">
+                Our local AI detected you might be leaving. Take 20% OFF!
             </p>
             <input type="email" id="op-ecom-email" placeholder="your@email.com" style="
                 width:100%;padding:14px 16px;font-size:1rem;border:2px solid rgba(255,255,255,0.3);
@@ -266,10 +299,7 @@
             <button id="op-ecom-submit" style="
                 background:#fff;color:#EA580C;border:none;padding:14px 24px;
                 font-size:1.05rem;border-radius:12px;cursor:pointer;width:100%;
-                font-weight:700;font-family:inherit;transition:transform 0.2s,box-shadow 0.2s;
-                box-shadow:0 4px 15px rgba(0,0,0,0.1);"
-                onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.15)'"
-                onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.1)'"
+                font-weight:700;font-family:inherit;box-shadow:0 4px 15px rgba(0,0,0,0.1);"
             >Get My Discount</button>
             <button id="op-ecom-close" style="
                 background:transparent;border:none;color:rgba(255,255,255,0.6);margin-top:1rem;
@@ -279,52 +309,25 @@
 
         overlay.appendChild(popup);
         document.body.appendChild(overlay);
-
-        // Focus email input
         setTimeout(() => document.getElementById('op-ecom-email')?.focus(), 400);
 
-        // Handle email submission
         document.getElementById('op-ecom-submit').onclick = async () => {
             const emailInput = document.getElementById('op-ecom-email');
             const email = emailInput.value.trim();
+            if (!email || !email.includes('@')) return;
 
-            if (!email || !email.includes('@')) {
-                emailInput.style.borderColor = '#FCA5A5';
-                emailInput.style.animation = 'opPulse 0.3s';
-                return;
-            }
-
-            // Call email-capture API
             const result = await sendToAPI('/tracker/email-capture', {
-                session_id: sessionId,
-                email: email,
-                cart_value: cartValue
+                session_id: sessionId, email: email, cart_value: cartValue
             });
 
             if (result && result.success) {
-                // Step 2: Show discount code with orange theme
                 popup.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
                 popup.innerHTML = `
                     <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎉</div>
-                    <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Your Exclusive Discount!</h2>
-                    <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;">
-                        Here's your <strong>${result.discount_percent}% OFF</strong> code:
-                    </p>
-                    <div style="background:rgba(255,255,255,0.15);padding:18px;border-radius:12px;margin-bottom:1.5rem;border:1px solid rgba(255,255,255,0.2);">
-                        <code style="font-size:1.6rem;color:#fff;font-weight:800;user-select:all;letter-spacing:0.1em;">
-                            ${result.discount_code}
-                        </code>
-                    </div>
-                    <p style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:1.5rem;">
-                        Valid for 24 hours &bull; We've also sent it to ${email}
-                    </p>
-                    <button id="op-ecom-done" style="
-                        background:#fff;color:#059669;border:none;padding:14px 24px;
-                        font-size:1.05rem;border-radius:12px;cursor:pointer;width:100%;
-                        font-weight:700;font-family:inherit;box-shadow:0 4px 15px rgba(0,0,0,0.1);"
-                    >Continue Shopping</button>
+                    <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Success!</h2>
+                    <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;">Use code: <strong>${result.discount_code}</strong></p>
+                    <button id="op-ecom-done" style="background:#fff;color:#059669;border:none;padding:14px 24px;border-radius:12px;cursor:pointer;width:100%;font-weight:700;">Continue</button>
                 `;
-
                 document.getElementById('op-ecom-done').onclick = () => {
                     trackEvent('discount_claimed', 'intervention', 'claim_discount', result.discount_percent);
                     overlay.remove();
@@ -332,103 +335,42 @@
             }
         };
 
-        document.getElementById('op-ecom-close').onclick = () => {
-            trackEvent('click', 'intervention', 'dismiss', 0);
-            overlay.remove();
-        };
+        document.getElementById('op-ecom-close').onclick = () => overlay.remove();
     }
 
-    // NEW: Proactive AI-based exit detection (replaces mouse-based detection)
-    let aiPollInterval = null;
-
-    function setupProactiveAI() {
-        // Start polling the AI every few seconds
-        aiPollInterval = setInterval(async () => {
-            if (!sessionId || exitIntentChecked) return;
-
-            // SMART PAGE FILTER: Never show popup on high-intent pages!
-            // Users on checkout/cart/success are ALREADY buying — don't give them a discount!
-            const path = window.location.pathname.toLowerCase();
-            const isHighIntentPage = path.includes('checkout') ||
-                path.includes('cart') ||
-                path.includes('success');
-            if (isHighIntentPage) {
-                console.log('[OP-ECOM Tracker] AI Polling: Skipped — user is on high-intent page (buying!)');
-                return;
-            }
-
-            // Make sure user has been on page for at least 3 seconds
-            const dwellTime = (Date.now() - currentPageStart) / 1000;
-            if (dwellTime < 3) return;
-
-            console.log('[OP-ECOM Tracker] AI Polling: Checking abandonment risk...');
-
-            const result = await sendToAPI('/tracker/check-intent', {
-                session_id: sessionId
-            });
-
-            if (result && result.abandonment_prob !== undefined && result.abandonment_prob !== null) {
-                console.log(`[OP-ECOM Tracker] AI Prediction: ${(result.abandonment_prob * 100).toFixed(1)}% abandonment risk`);
-
-                // If AI detects high abandonment risk, trigger intervention
-                if (result.abandonment_prob > AI_THRESHOLD && result.should_intervene) {
-                    console.log('[OP-ECOM Tracker] AI DETECTED HIGH RISK - Triggering intervention!');
-                    exitIntentChecked = true;
-                    clearInterval(aiPollInterval); // Stop polling after intervention
-                    showInterventionPopup(result.probability);
-                }
-            }
-        }, AI_POLL_INTERVAL);
-
-        console.log(`[OP-ECOM Tracker] Proactive AI monitoring started (polling every ${AI_POLL_INTERVAL / 1000}s)`);
-    }
-
-    // Initialize
     async function init() {
         await startSession();
+        await initModel();
 
-        // Start proactive AI-based detection (pure AI, no mouse events)
-        setupProactiveAI();
+        // Local AI Inference Loop
+        setInterval(async () => {
+            updatePageHistory();
+            await runLocalInference();
+        }, AI_POLL_INTERVAL);
 
-        // Track page views on navigation
         window.addEventListener('beforeunload', () => {
+            updatePageHistory();
             trackPageView();
-            if (aiPollInterval) clearInterval(aiPollInterval);
         });
 
-        // Handle SPA navigation
         window.addEventListener('popstate', handlePageChange);
-
-        // Intercept history pushState for SPA
         const originalPushState = history.pushState;
         history.pushState = function () {
+            updatePageHistory();
             trackPageView();
             originalPushState.apply(history, arguments);
             currentPageStart = Date.now();
             currentPageUrl = window.location.href;
         };
-
-        // End session on page close (modern)
         window.addEventListener('pagehide', endSession);
-
-        console.log('[OP-ECOM Tracker] Initialized with PROACTIVE AI detection. AI will predict abandonment automatically.');
+        console.log('[OP-ECOM Tracker] Initialized with EDGE AI (Local Inference).');
     }
 
-    // Expose global API
     window.opEcomTracker = {
-        trackEvent,
-        trackPurchase,
-        getSessionId: () => sessionId,
-        checkExitIntent: () => {
-            exitIntentChecked = false; // Reset lock for manual test
-            checkExitIntent();
-        }
+        trackEvent, trackPurchase, getSessionId: () => sessionId,
+        checkExitIntent: async () => { exitIntentChecked = false; await runLocalInference(); }
     };
 
-    // Start tracking
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
