@@ -217,49 +217,71 @@
         trackEvent('exit_intent_shown', 'intervention', 'popup_displayed', Math.round(probability * 100));
 
         // Get cart value for personalized discount
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        const cartValue = cart.reduce((sum, item) => sum + (item.price || 0), 0);
+        const cart = JSON.parse(localStorage.getItem('shopDemo_cart') || '[]');
+        const cartValue = cart.reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 1)), 0);
 
         // Create popup elements
         const overlay = document.createElement('div');
         overlay.id = 'op-ecom-overlay';
         Object.assign(overlay.style, {
             position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-            backgroundColor: 'rgba(0,0,0,0.7)', zIndex: '9999', display: 'flex',
-            justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)'
+            backgroundColor: 'rgba(0,0,0,0.6)', zIndex: '99999', display: 'flex',
+            justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(8px)',
+            animation: 'opFadeIn 0.3s ease'
         });
+
+        // Add animation keyframes
+        if (!document.getElementById('op-ecom-animations')) {
+            const style = document.createElement('style');
+            style.id = 'op-ecom-animations';
+            style.textContent = `
+                @keyframes opFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes opSlideUp { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+                @keyframes opPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+            `;
+            document.head.appendChild(style);
+        }
 
         const popup = document.createElement('div');
         Object.assign(popup.style, {
-            backgroundColor: 'white', padding: '2rem', borderRadius: '15px',
-            maxWidth: '400px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-            fontFamily: "'Segoe UI', sans-serif"
+            background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+            padding: '2.5rem', borderRadius: '20px', maxWidth: '420px', width: '90%',
+            textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+            fontFamily: "'Inter', 'Segoe UI', sans-serif", color: 'white',
+            animation: 'opSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)'
         });
 
         // Step 1: Email capture form
         popup.innerHTML = `
-            <div style="font-size: 3rem; margin-bottom: 1rem;">🎁</div>
-            <h2 style="color: #1E4FA8; margin-bottom: 0.5rem;">Wait! Don't Go!</h2>
-            <p style="color: #666; margin-bottom: 1.5rem;">
-                Enter your email to unlock an <strong>exclusive discount</strong> just for you!
+            <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎁</div>
+            <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;">Wait! Don't Leave Empty-Handed</h2>
+            <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;line-height:1.6;">
+                Enter your email to unlock an <strong style="color:#fff;">exclusive discount</strong> just for you!
             </p>
             <input type="email" id="op-ecom-email" placeholder="your@email.com" style="
-                width: 100%; padding: 12px; font-size: 1rem; border: 2px solid #ddd;
-                border-radius: 8px; margin-bottom: 1rem; box-sizing: border-box;
+                width:100%;padding:14px 16px;font-size:1rem;border:2px solid rgba(255,255,255,0.3);
+                border-radius:12px;margin-bottom:1rem;box-sizing:border-box;background:rgba(255,255,255,0.15);
+                color:#fff;outline:none;font-family:inherit;
             " />
             <button id="op-ecom-submit" style="
-                background: #1E4FA8; color: white; border: none; padding: 12px 24px;
-                font-size: 1.1rem; border-radius: 8px; cursor: pointer; width: 100%;
-                transition: transform 0.2s;"
+                background:#fff;color:#EA580C;border:none;padding:14px 24px;
+                font-size:1.05rem;border-radius:12px;cursor:pointer;width:100%;
+                font-weight:700;font-family:inherit;transition:transform 0.2s,box-shadow 0.2s;
+                box-shadow:0 4px 15px rgba(0,0,0,0.1);"
+                onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.15)'"
+                onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.1)'"
             >Get My Discount</button>
             <button id="op-ecom-close" style="
-                background: transparent; border: none; color: #999; margin-top: 1rem;
-                cursor: pointer; text-decoration: underline;"
+                background:transparent;border:none;color:rgba(255,255,255,0.6);margin-top:1rem;
+                cursor:pointer;font-size:0.85rem;font-family:inherit;"
             >No thanks, I'll pay full price</button>
         `;
 
         overlay.appendChild(popup);
         document.body.appendChild(overlay);
+
+        // Focus email input
+        setTimeout(() => document.getElementById('op-ecom-email')?.focus(), 400);
 
         // Handle email submission
         document.getElementById('op-ecom-submit').onclick = async () => {
@@ -267,7 +289,8 @@
             const email = emailInput.value.trim();
 
             if (!email || !email.includes('@')) {
-                emailInput.style.borderColor = 'red';
+                emailInput.style.borderColor = '#FCA5A5';
+                emailInput.style.animation = 'opPulse 0.3s';
                 return;
             }
 
@@ -279,24 +302,26 @@
             });
 
             if (result && result.success) {
-                // Step 2: Show discount code
+                // Step 2: Show discount code with orange theme
+                popup.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
                 popup.innerHTML = `
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
-                    <h2 style="color: #10b981; margin-bottom: 0.5rem;">Your Exclusive Discount!</h2>
-                    <p style="color: #666; margin-bottom: 1.5rem;">
+                    <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎉</div>
+                    <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Your Exclusive Discount!</h2>
+                    <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;">
                         Here's your <strong>${result.discount_percent}% OFF</strong> code:
                     </p>
-                    <div style="background: #eef2ff; padding: 15px; border-radius: 8px; margin-bottom: 1.5rem;">
-                        <code style="font-size: 1.5rem; color: #1E4FA8; font-weight: bold; user-select: all;">
+                    <div style="background:rgba(255,255,255,0.15);padding:18px;border-radius:12px;margin-bottom:1.5rem;border:1px solid rgba(255,255,255,0.2);">
+                        <code style="font-size:1.6rem;color:#fff;font-weight:800;user-select:all;letter-spacing:0.1em;">
                             ${result.discount_code}
                         </code>
                     </div>
-                    <p style="color: #999; font-size: 0.85rem; margin-bottom: 1.5rem;">
-                        Valid for 24 hours • We've also sent it to ${email}
+                    <p style="color:rgba(255,255,255,0.7);font-size:0.8rem;margin-bottom:1.5rem;">
+                        Valid for 24 hours &bull; We've also sent it to ${email}
                     </p>
                     <button id="op-ecom-done" style="
-                        background: #10b981; color: white; border: none; padding: 12px 24px;
-                        font-size: 1.1rem; border-radius: 8px; cursor: pointer; width: 100%;"
+                        background:#fff;color:#059669;border:none;padding:14px 24px;
+                        font-size:1.05rem;border-radius:12px;cursor:pointer;width:100%;
+                        font-weight:700;font-family:inherit;box-shadow:0 4px 15px rgba(0,0,0,0.1);"
                     >Continue Shopping</button>
                 `;
 
@@ -342,7 +367,7 @@
                 session_id: sessionId
             });
 
-            if (result && result.abandonment_prob) {
+            if (result && result.abandonment_prob !== undefined && result.abandonment_prob !== null) {
                 console.log(`[OP-ECOM Tracker] AI Prediction: ${(result.abandonment_prob * 100).toFixed(1)}% abandonment risk`);
 
                 // If AI detects high abandonment risk, trigger intervention

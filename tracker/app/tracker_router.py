@@ -381,6 +381,7 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             "decision": " | ".join(reasons) if reasons else "AI detected exit intent"
         }
     
+    print(f"[DEBUG] check_intent: abandonment={abandonment_prob:.4f}, purchase={purchase_prob:.4f}, intervene={should_intervene}")
     return IntentCheckResponse(
         probability=float(combined_prob),
         should_intervene=should_intervene,

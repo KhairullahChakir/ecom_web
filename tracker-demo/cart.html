@@ -2,53 +2,57 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping Cart - ShopDemo</title>
-    <link rel="stylesheet" href="/src/style.css" />
+    <meta name="description" content="Review your shopping cart and proceed to checkout.">
+    <link rel="stylesheet" href="/src/style.css">
 </head>
 
 <body>
+    <!-- Navigation -->
     <nav class="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo">🛒 ShopDemo</a>
-            <div class="nav-links">
-                <a href="/" class="nav-link">Home</a>
-                <a href="/products.html" class="nav-link">Products</a>
-                <a href="/about.html" class="nav-link">About</a>
-                <a href="/cart.html" class="nav-link cart-link active">🛒 Cart <span id="cart-count">0</span></a>
-            </div>
+        <a href="/" class="logo">Shop<span>Demo</span></a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/products.html">Products</a>
+            <a href="/about.html">About</a>
+            <a href="/cart.html" class="cart-link active">
+                Cart <span class="cart-count" id="cart-count">0</span>
+            </a>
         </div>
     </nav>
 
-    <div class="page-container">
-        <div class="page-header">
-            <h1>Shopping Cart</h1>
-            <p>Review your items before checkout</p>
-        </div>
+    <!-- Cart Section -->
+    <div class="section-header">
+        <h2>Your Cart</h2>
+        <p>Review your items before checkout</p>
+    </div>
 
-        <div class="cart-items" id="cart-items">
-            <!-- Cart items rendered by JS -->
-        </div>
-
-        <div class="cart-summary" id="cart-summary">
-            <div class="cart-total">
-                <span>Total:</span>
-                <span id="cart-total">$0.00</span>
-            </div>
-            <a href="/checkout.html" class="btn btn-success" style="width: 100%; text-align: center;">
-                Proceed to Checkout
-            </a>
+    <div class="cart-container">
+        <div id="cart-items"></div>
+        <div class="cart-summary" id="cart-summary" style="display:none;">
+            <p class="cart-total">Total: <span class="amount" id="cart-total">$0.00</span></p>
+            <a href="/checkout.html" class="btn btn-primary">Proceed to Checkout</a>
         </div>
     </div>
 
+    <!-- Tracker Notice -->
+    <div class="tracker-notice">
+        <div class="tracker-badge">
+            <span class="dot"></span>
+            Page Type: Administrative
+        </div>
+    </div>
+
+    <!-- Footer -->
     <footer class="footer">
-        <p>ShopDemo - OP-ECOM Analytics Demo</p>
-        <p class="tracker-info">📡 Page Type: Administrative</p>
+        <strong>ShopDemo</strong> &mdash; OP-ECOM Analytics Demo
+        <p class="tracker-info">Powered by AI-driven exit intent prediction</p>
     </footer>
 
     <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
-    <script type="module" src="/src/main.js"></script>
+    <script src="/src/main.js"></script>
 </body>
 
 </html>

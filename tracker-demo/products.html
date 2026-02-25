@@ -2,43 +2,52 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Products - ShopDemo</title>
-    <link rel="stylesheet" href="/src/style.css" />
+    <meta name="description" content="Browse our full product catalog with AI-powered shopping assistance.">
+    <link rel="stylesheet" href="/src/style.css">
 </head>
 
 <body>
+    <!-- Navigation -->
     <nav class="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo">🛒 ShopDemo</a>
-            <div class="nav-links">
-                <a href="/" class="nav-link">Home</a>
-                <a href="/products.html" class="nav-link active">Products</a>
-                <a href="/about.html" class="nav-link">About</a>
-                <a href="/cart.html" class="nav-link cart-link">🛒 Cart <span id="cart-count">0</span></a>
-            </div>
+        <a href="/" class="logo">Shop<span>Demo</span></a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/products.html" class="active">Products</a>
+            <a href="/about.html">About</a>
+            <a href="/cart.html" class="cart-link">
+                Cart <span class="cart-count" id="cart-count">0</span>
+            </a>
         </div>
     </nav>
 
-    <div class="page-container">
-        <div class="page-header">
-            <h1>Our Products</h1>
-            <p>Browse our premium collection</p>
-        </div>
+    <!-- Section Header -->
+    <div class="section-header">
+        <h2>All Products</h2>
+        <p>Find what you need from our premium collection</p>
+    </div>
 
-        <div class="product-grid" id="products-grid">
-            <!-- Products rendered by JS -->
+    <!-- Product Grid -->
+    <div class="product-grid" id="product-list"></div>
+
+    <!-- Tracker Notice -->
+    <div class="tracker-notice">
+        <div class="tracker-badge">
+            <span class="dot"></span>
+            Page Type: ProductRelated
         </div>
     </div>
 
+    <!-- Footer -->
     <footer class="footer">
-        <p>ShopDemo - OP-ECOM Analytics Demo</p>
-        <p class="tracker-info">📡 Page Type: ProductRelated</p>
+        <strong>ShopDemo</strong> &mdash; OP-ECOM Analytics Demo
+        <p class="tracker-info">Powered by AI-driven exit intent prediction</p>
     </footer>
 
     <script src="http://localhost:8001/tracker/static/tracker.js" data-api="http://localhost:8001"></script>
-    <script type="module" src="/src/main.js"></script>
+    <script src="/src/main.js"></script>
 </body>
 
 </html>
