@@ -1,9 +1,6 @@
 /**
  * OP-ECOM Analytics Tracker - JavaScript Client
- * Lightweight script to track user behavior on any website
- * 
- * Usage:
- * <script src="tracker.js" data-api="http://localhost:8001"></script>
+ * Edge AI (Local Inference) + Hybrid Golden Logic
  */
 
 (function () {
@@ -12,7 +9,7 @@
     // Configuration
     const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8002';
     const SESSION_KEY = 'op_ecom_session_id';
-    const AI_POLL_INTERVAL = 3000; // Check local AI every 3 seconds
+    const AI_POLL_INTERVAL = 3000;
     const AI_THRESHOLD = 0.60;
     const MODEL_URL = `${API_URL}/tracker/models/tcn_real_standalone.onnx`;
 
@@ -24,11 +21,13 @@
     let ortSession = null;
     let exitIntentChecked = false;
 
-    // Page type to index mapping (must match backend)
+    // Page type to index mapping (Must align with Rigorous Training)
+    // 0: Padding, 1: Browsing (Views), 2: Intent (Add to Cart), 3: Success (Transaction)
     const PAGE_TYPE_TO_IDX = {
-        'Home': 0, 'Product': 1, 'ProductDetail': 1, 'Cart': 2,
-        'Checkout': 2, 'About': 3, 'Account': 3,
-        'Administrative': 2, 'Informational': 3, 'ProductRelated': 1
+        'Home': 1, 'Product': 1, 'ProductDetail': 1, 'Cart': 1,
+        'Checkout': 1, 'About': 1, 'Account': 1,
+        'Administrative': 1, 'Informational': 1, 'ProductRelated': 1,
+        'AddToCartEvent': 2
     };
 
     // Load ONNX Runtime Web
@@ -57,11 +56,15 @@
 
     function updatePageHistory() {
         const duration = (Date.now() - currentPageStart) / 1000;
-        const entry = {
-            type: getPageType(),
-            duration: Math.min(duration, 180)
-        };
-        pageHistory.push(entry);
+        const type = getPageType();
+
+        // Prevent Flooding: If same page type and very short duration, don't add
+        if (pageHistory.length > 0) {
+            const last = pageHistory[pageHistory.length - 1];
+            if (last.type === type && duration < 0.5) return;
+        }
+
+        pageHistory.push({ type, duration: Math.min(duration, 600) });
         if (pageHistory.length > 20) pageHistory.shift();
         localStorage.setItem('op_ecom_history', JSON.stringify(pageHistory));
     }
@@ -73,99 +76,120 @@
         const path = window.location.pathname.toLowerCase();
         if (path.includes('checkout') || path.includes('cart') || path.includes('success')) return;
 
-        // Ensure we have some history
-        if (pageHistory.length === 0) return;
-
         try {
-            // Prepare inputs
+            // DYNAMIC SEQUENCE: Past history + current dwell time
+            const currentType = getPageType();
+            const currentDwell = (Date.now() - currentPageStart) / 1000;
+
+            // Build the raw sequence: past events + current page
+            const rawSeq = [...pageHistory, { type: currentType, duration: currentDwell }];
+
+            // MINIMUM HISTORY GATE: The model was trained on 96.4% abandonment data.
+            // Short sequences (< 3 events) always predict 100% because most short
+            // sessions in the training set were indeed abandonments.
+            // We need at least 3 meaningful events before the AI can make a fair judgment.
+            const MIN_EVENTS = 3;
+            if (rawSeq.length < MIN_EVENTS) {
+                console.log(`[OP-ECOM Tracker] AI Engine: Collecting data... (${rawSeq.length}/${MIN_EVENTS} events)`);
+                return;
+            }
+
+            // SEQUENCE FILLING: The model expects 20 events. With fewer events,
+            // zeros cause 100% risk (model learned: zeros = no activity = abandoned).
+            // Solution: Fill the full 20-slot array by repeating the user's ACTUAL
+            // behavior pattern, so the model sees a "typical session" from this user.
             const maxSeqLen = 20;
-            const pageIdsSet = new BigInt64Array(maxSeqLen).fill(0n);
-            const durationsSet = new Float32Array(maxSeqLen).fill(0.0);
+            const pageIdsSet = new BigInt64Array(maxSeqLen);
+            const durationsSet = new Float32Array(maxSeqLen);
 
-            // Fill with history
-            pageHistory.slice(-maxSeqLen).forEach((pv, i) => {
+            for (let i = 0; i < maxSeqLen; i++) {
+                const srcIdx = i < rawSeq.length ? i : (i % rawSeq.length);
+                const pv = rawSeq[srcIdx];
+
                 pageIdsSet[i] = BigInt(PAGE_TYPE_TO_IDX[pv.type] || 1);
-                durationsSet[i] = pv.duration / 180.0;
-            });
 
-            // Create tensors
-            const pageIdsTensor = new ort.Tensor('int64', pageIdsSet, [1, maxSeqLen]);
-            const durationsTensor = new ort.Tensor('float32', durationsSet, [1, maxSeqLen]);
+                // Last slot always gets the "ongoing" marker (0.05)
+                if (i === maxSeqLen - 1) {
+                    durationsSet[i] = 0.05;
+                } else {
+                    durationsSet[i] = Math.min(pv.duration / 600.0, 1.0);
+                }
+            }
 
-            // Run session
             const results = await ortSession.run({
-                'page_ids': pageIdsTensor,
-                'durations': durationsTensor
+                'page_ids': new ort.Tensor('int64', pageIdsSet, [1, maxSeqLen]),
+                'durations': new ort.Tensor('float32', durationsSet, [1, maxSeqLen])
             });
 
-            // Sigmoid on output
             const logits = results[Object.keys(results)[0]].data[0];
             const prob = 1 / (1 + Math.exp(-logits));
 
-            console.log(`[OP-ECOM Tracker] Local AI Prediction: ${(prob * 100).toFixed(1)}% abandonment risk`);
+            // Log risk score
+            console.log(`[OP-ECOM Tracker] AI Prediction: ${(prob * 100).toFixed(1)}% abandonment risk (${rawSeq.length} events)`);
 
+            // Hybrid Check (The Golden Logic)
             if (prob > AI_THRESHOLD) {
-                console.log('[OP-ECOM Tracker] LOCAL AI DETECTED HIGH RISK - Triggering intervention!');
-                exitIntentChecked = true;
-                showInterventionPopup(prob);
+                // COOLDOWN: If we just checked this second, don't spam
+                const lastCheck = parseInt(sessionStorage.getItem('op_ecom_last_check') || '0');
+                if (Date.now() - lastCheck < 30000) return; // 30s cooldown for server hits
+
+                console.log(`[OP-ECOM Tracker] Local AI detected high risk (${(prob * 100).toFixed(1)}%). Verifying buyer value...`);
+                sessionStorage.setItem('op_ecom_last_check', Date.now().toString());
+
+                const cart = JSON.parse(localStorage.getItem('shopDemo_cart') || '[]');
+                const cartValue = cart.reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 1)), 0);
+
+                const result = await sendToAPI('/tracker/check-intent', {
+                    session_id: sessionId, cart_value: cartValue,
+                    local_abandonment_score: prob
+                });
+
+                if (result && result.should_intervene) {
+                    console.log(`[OP-ECOM Tracker] GOLDEN LOGIC VERIFIED: Model1(TabM)=${(result.purchase_prob * 100).toFixed(1)}% purchase | Model2(TCN)=${(prob * 100).toFixed(1)}% risk => Intervention!`);
+                    exitIntentChecked = true;
+                    showInterventionPopup(prob);
+                } else {
+                    // Logic: Only log when threshold crossed, otherwise stays silent to prevent console noise
+                    console.log(`[OP-ECOM Tracker] Business Logic: Intervention declined (Purchase Prob: ${(result?.purchase_prob * 100).toFixed(1)}%)`);
+                }
             }
         } catch (e) {
             console.warn('[OP-ECOM Tracker] Local inference failed:', e);
         }
     }
 
-    // Utility functions
-    function generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-
+    // Utility Functions
     function getBrowserInfo() {
         const ua = navigator.userAgent;
-        let browser = 'Unknown';
-        if (ua.includes('Chrome')) browser = 'Chrome';
-        else if (ua.includes('Firefox')) browser = 'Firefox';
-        else if (ua.includes('Safari')) browser = 'Safari';
-        else if (ua.includes('Edge')) browser = 'Edge';
-        else if (ua.includes('Opera')) browser = 'Opera';
-        return browser;
+        if (ua.includes('Chrome')) return 'Chrome';
+        if (ua.includes('Firefox')) return 'Firefox';
+        if (ua.includes('Safari')) return 'Safari';
+        return 'Other';
     }
 
     function getOS() {
         const ua = navigator.userAgent;
         if (ua.includes('Windows')) return 'Windows';
         if (ua.includes('Mac')) return 'MacOS';
-        if (ua.includes('Linux')) return 'Linux';
-        if (ua.includes('Android')) return 'Android';
-        if (ua.includes('iOS') || ua.includes('iPhone')) return 'iOS';
-        return 'Unknown';
+        return 'Other';
     }
 
     function getPageType() {
         const path = window.location.pathname.toLowerCase();
         if (path === '/' || path === '' || path.includes('index.html')) return 'Home';
-        if (path.includes('account') || path.includes('cart') || path.includes('checkout') || path.includes('settings')) return 'Administrative';
-        if (path.includes('about') || path.includes('contact') || path.includes('faq') || path.includes('help')) return 'Informational';
+        if (path.includes('about') || path.includes('contact')) return 'Informational';
+        if (path.includes('cart') || path.includes('checkout') || path.includes('account')) return 'Administrative';
         return 'ProductRelated';
     }
-
-    function getPageValue() { return 0; }
 
     async function sendToAPI(endpoint, data) {
         try {
             const response = await fetch(`${API_URL}${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             return await response.json();
-        } catch (error) {
-            console.warn('[OP-ECOM Tracker] API Error:', error.message);
-            return null;
-        }
+        } catch (error) { return null; }
     }
 
     // Session Management
@@ -181,17 +205,16 @@
         localStorage.setItem('op_ecom_returning', 'true');
 
         const result = await sendToAPI('/tracker/session/start', {
-            visitor_type: visitorType,
-            browser: getBrowserInfo(),
-            operating_system: getOS(),
-            region: 1,
-            traffic_type: document.referrer ? 2 : 1
+            visitor_type: visitorType, browser: getBrowserInfo(),
+            operating_system: getOS(), region: 1, traffic_type: 1
         });
 
         if (result?.session_id) {
             sessionId = result.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
-            console.log('[OP-ECOM Tracker] Session started:', sessionId);
+            pageHistory = []; // Wipe history on new session
+            localStorage.setItem('op_ecom_history', '[]');
+            console.log('[OP-ECOM Tracker] New session started. History cleared.');
         }
     }
 
@@ -200,177 +223,117 @@
         await trackPageView();
         await sendToAPI('/tracker/session/end', { session_id: sessionId });
         localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem('op_ecom_history');
     }
 
-    // Page View Tracking
     async function trackPageView() {
         if (!sessionId) return;
         const duration = (Date.now() - currentPageStart) / 1000;
+        // Map frontend page types to backend PageTypeEnum values
+        const pageType = getPageType();
+        const BACKEND_PAGE_TYPE = {
+            'Home': 'ProductRelated', 'Product': 'ProductRelated',
+            'ProductDetail': 'ProductRelated', 'ProductRelated': 'ProductRelated',
+            'About': 'Informational', 'Informational': 'Informational',
+            'Cart': 'Administrative', 'Checkout': 'Administrative',
+            'Account': 'Administrative', 'Administrative': 'Administrative'
+        };
         await sendToAPI('/tracker/pageview', {
-            session_id: sessionId,
-            page_type: getPageType(),
-            page_url: currentPageUrl,
-            page_title: document.title,
-            duration_seconds: duration,
-            is_bounce: duration < 1,
-            is_exit: false,
-            page_value: getPageValue(),
-            scroll_depth: Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100) || 0
+            session_id: sessionId, page_type: BACKEND_PAGE_TYPE[pageType] || 'ProductRelated',
+            page_url: window.location.href, page_title: document.title,
+            duration_seconds: duration, is_bounce: duration < 2,
+            is_exit: false, page_value: 0, scroll_depth: 0
         });
     }
 
-    // Event Tracking
     async function trackEvent(eventType, eventCategory, eventLabel, eventValue, eventData) {
         if (!sessionId) return;
+
+        // Add significant events to TCN history
+        if (eventType === 'add_to_cart') {
+            pageHistory.push({ type: 'AddToCartEvent', duration: 0.5 });
+            localStorage.setItem('op_ecom_history', JSON.stringify(pageHistory));
+        }
+
         await sendToAPI('/tracker/event', {
-            session_id: sessionId,
-            event_type: eventType,
-            event_category: eventCategory || null,
-            event_label: eventLabel || null,
-            event_value: eventValue || 0,
-            event_data: eventData || null
+            session_id: sessionId, event_type: eventType,
+            event_category: eventCategory, event_label: eventLabel,
+            event_value: eventValue, event_data: eventData
         });
     }
 
-    // Purchase Tracking
     async function trackPurchase(orderValue) {
         if (!sessionId) return;
-        await sendToAPI('/tracker/purchase', { session_id: sessionId, order_value: orderValue || 0 });
+        await sendToAPI('/tracker/purchase', { session_id: sessionId, order_value: orderValue });
+        endSession();
     }
 
-    // Page Navigation Handling
-    function handlePageChange() {
-        updatePageHistory();
-        trackPageView();
-        currentPageStart = Date.now();
-        currentPageUrl = window.location.href;
-    }
-
-    async function checkExitIntent() {
-        // Manual check still uses local inference
-        await runLocalInference();
-    }
-
-    function showInterventionPopup(probability) {
-        trackEvent('exit_intent_shown', 'intervention', 'popup_displayed', Math.round(probability * 100));
-        const cart = JSON.parse(localStorage.getItem('shopDemo_cart') || '[]');
-        const cartValue = cart.reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 1)), 0);
+    // UI Intervention
+    function showInterventionPopup(prob) {
+        if (document.getElementById('op-ecom-overlay')) return;
 
         const overlay = document.createElement('div');
         overlay.id = 'op-ecom-overlay';
-        Object.assign(overlay.style, {
-            position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-            backgroundColor: 'rgba(0,0,0,0.6)', zIndex: '99999', display: 'flex',
-            justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(8px)',
-            animation: 'opFadeIn 0.3s ease'
-        });
+        overlay.style = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:inherit;animate:fadeIn 0.3s;';
 
-        if (!document.getElementById('op-ecom-animations')) {
-            const style = document.createElement('style');
-            style.id = 'op-ecom-animations';
-            style.textContent = `
-                @keyframes opFadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes opSlideUp { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-                @keyframes opPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-            `;
-            document.head.appendChild(style);
-        }
+        const cartValue = localStorage.getItem('shopDemo_cart_total') || '0.00';
 
-        const popup = document.createElement('div');
-        Object.assign(popup.style, {
-            background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
-            padding: '2.5rem', borderRadius: '20px', maxWidth: '420px', width: '90%',
-            textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
-            fontFamily: "'Inter', 'Segoe UI', sans-serif", color: 'white',
-            animation: 'opSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)'
-        });
-
-        popup.innerHTML = `
-            <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎁</div>
-            <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Wait! Edge AI Offer</h2>
-            <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;font-size:0.95rem;">
-                Our local AI detected you might be leaving. Take 20% OFF!
-            </p>
-            <input type="email" id="op-ecom-email" placeholder="your@email.com" style="
-                width:100%;padding:14px 16px;font-size:1rem;border:2px solid rgba(255,255,255,0.3);
-                border-radius:12px;margin-bottom:1rem;box-sizing:border-box;background:rgba(255,255,255,0.15);
-                color:#fff;outline:none;font-family:inherit;
-            " />
-            <button id="op-ecom-submit" style="
-                background:#fff;color:#EA580C;border:none;padding:14px 24px;
-                font-size:1.05rem;border-radius:12px;cursor:pointer;width:100%;
-                font-weight:700;font-family:inherit;box-shadow:0 4px 15px rgba(0,0,0,0.1);"
-            >Get My Discount</button>
-            <button id="op-ecom-close" style="
-                background:transparent;border:none;color:rgba(255,255,255,0.6);margin-top:1rem;
-                cursor:pointer;font-size:0.85rem;font-family:inherit;"
-            >No thanks, I'll pay full price</button>
+        overlay.innerHTML = `
+            <div id="op-ecom-popup" style="background:#fff;padding:2.5rem;border-radius:24px;width:90%;max-width:420px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);position:relative;">
+                <div style="position:absolute;top:1rem;right:1rem;cursor:pointer;font-size:1.2rem;color:#94a3b8;" id="op-ecom-close">✕</div>
+                <div style="width:70px;height:70px;background:#fff7ed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 1.5rem;box-shadow:inset 0 2px 4px 0 rgba(0,0,0,0.06);">🎁</div>
+                <h2 style="color:#1e293b;margin-bottom:0.75rem;font-size:1.75rem;font-weight:800;letter-spacing:-0.025em;">Wait! Don't Go...</h2>
+                <p style="color:#64748b;margin-bottom:2rem;line-height:1.6;font-size:1.05rem;">We noticed you have items in your cart. Get <strong>20% OFF</strong> your order if you finish now!</p>
+                <div style="background:#f8fafc;padding:1.25rem;border-radius:16px;margin-bottom:2rem;border:1px solid #f1f5f9;">
+                    <input type="email" id="op-ecom-email" placeholder="Enter your email" style="width:100%;padding:12px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:1rem;outline:none;">
+                    <button id="op-ecom-claim" style="background:linear-gradient(to right, #f97316, #fb923c);color:#fff;border:none;padding:14px;border-radius:12px;cursor:pointer;width:100%;font-weight:700;font-size:1rem;box-shadow:0 10px 15px -3px rgba(249, 115, 22, 0.3);">Claim My Discount</button>
+                </div>
+            </div>
         `;
 
-        overlay.appendChild(popup);
         document.body.appendChild(overlay);
-        setTimeout(() => document.getElementById('op-ecom-email')?.focus(), 400);
 
-        document.getElementById('op-ecom-submit').onclick = async () => {
-            const emailInput = document.getElementById('op-ecom-email');
-            const email = emailInput.value.trim();
+        document.getElementById('op-ecom-claim').onclick = async () => {
+            const email = document.getElementById('op-ecom-email').value;
             if (!email || !email.includes('@')) return;
-
-            const result = await sendToAPI('/tracker/email-capture', {
-                session_id: sessionId, email: email, cart_value: cartValue
-            });
-
-            if (result && result.success) {
-                popup.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
-                popup.innerHTML = `
-                    <div style="width:60px;height:60px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 1.2rem;">🎉</div>
-                    <h2 style="color:#fff;margin-bottom:0.5rem;font-size:1.6rem;font-weight:800;">Success!</h2>
-                    <p style="color:rgba(255,255,255,0.85);margin-bottom:1.5rem;">Use code: <strong>${result.discount_code}</strong></p>
-                    <button id="op-ecom-done" style="background:#fff;color:#059669;border:none;padding:14px 24px;border-radius:12px;cursor:pointer;width:100%;font-weight:700;">Continue</button>
-                `;
-                document.getElementById('op-ecom-done').onclick = () => {
-                    trackEvent('discount_claimed', 'intervention', 'claim_discount', result.discount_percent);
-                    overlay.remove();
-                };
-            }
+            const res = await sendToAPI('/tracker/email-capture', { session_id: sessionId, email, cart_value: parseFloat(cartValue) });
+            if (res?.success) overlay.remove();
         };
-
         document.getElementById('op-ecom-close').onclick = () => overlay.remove();
     }
 
     async function init() {
+        // CLEANUP: If history is flooded with identical high-risk signals, clear it
+        if (pageHistory.length > 5) {
+            const firstType = pageHistory[0].type;
+            if (pageHistory.every(h => h.type === firstType && h.duration < 1)) {
+                pageHistory = [];
+                localStorage.setItem('op_ecom_history', '[]');
+            }
+        }
+
         await startSession();
         await initModel();
 
-        // Local AI Inference Loop
-        setInterval(async () => {
-            updatePageHistory();
-            await runLocalInference();
-        }, AI_POLL_INTERVAL);
+        // Record the current page load immediately so the AI sees it
+        updatePageHistory();
 
+        setInterval(runLocalInference, AI_POLL_INTERVAL);
+
+        // Save page history BEFORE navigation so the next page has the full sequence
         window.addEventListener('beforeunload', () => {
             updatePageHistory();
             trackPageView();
         });
-
-        window.addEventListener('popstate', handlePageChange);
-        const originalPushState = history.pushState;
-        history.pushState = function () {
-            updatePageHistory();
-            trackPageView();
-            originalPushState.apply(history, arguments);
-            currentPageStart = Date.now();
-            currentPageUrl = window.location.href;
-        };
         window.addEventListener('pagehide', endSession);
-        console.log('[OP-ECOM Tracker] Initialized with EDGE AI (Local Inference).');
     }
 
+    // Expose tracker API to the window scope so external code
+    // (e.g., demo site's addToCart button) can report events
     window.opEcomTracker = {
-        trackEvent, trackPurchase, getSessionId: () => sessionId,
-        checkExitIntent: async () => { exitIntentChecked = false; await runLocalInference(); }
+        trackEvent: trackEvent,
+        trackPurchase: trackPurchase
     };
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    init();
 })();

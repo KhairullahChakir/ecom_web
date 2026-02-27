@@ -61,7 +61,8 @@ class PurchaseRequest(BaseModel):
 
 class IntentCheckRequest(BaseModel):
     session_id: str
-    cart_value: float = 0.0  # NEW: For personalized discount calculation
+    cart_value: float = 0.0
+    local_abandonment_score: Optional[float] = None  # Browser's TCN score
 
 class IntentCheckResponse(BaseModel):
     probability: float

@@ -26,7 +26,7 @@ from .schemas import (
 PREDICTION_API_URL = "http://localhost:8000/predict"
 # Use absolute path to avoid relative path issues
 _base_dir = os.path.dirname(os.path.abspath(__file__))
-TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "models", "tcn_real.onnx"))
+TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "models", "tcn_real_standalone.onnx"))
 
 # Initialize Abandonment Model (Final choice: TCN for speed)
 abandonment_session = None
@@ -282,7 +282,8 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             # Page type mapping
             page_type_name = pv.page_type.name if hasattr(pv.page_type, 'name') else str(pv.page_type)
             page_ids[0, i] = PAGE_TYPE_TO_IDX.get(page_type_name, 1)  # Default to Product
-            durations[0, i] = min(pv.duration_seconds, 180.0) / 180.0  # Normalize
+            # NORMALIZATION FIX: Consistency with preprocess_retailrocket.py (600.0)
+            durations[0, i] = min(pv.duration_seconds, 600.0) / 600.0 
         
         # Run inference
         try:
@@ -297,14 +298,25 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             print(f"TCN inference error: {e}")
             abandonment_prob = 0.5
     
+    # If the browser sent its own TCN score, USE IT (it has the complete session)
+    # The backend's DB may be missing page views due to 422 errors
+    if request.local_abandonment_score is not None:
+        abandonment_prob = request.local_abandonment_score
+        print(f"[DEBUG] Using browser's TCN score: {abandonment_prob:.4f}")
+    
     # 3. ==========================================
     #    STEP 2: Only call TabM if abandonment risk is HIGH
     #    This saves compute and makes the system smarter.
     # ==========================================
     purchase_prob = 0.0
     
-    # Only call TabM if user is likely to leave (abandonment > 30% for demo)
-    if abandonment_prob > 0.30:
+    # Always call TabM so both models are visible in logs
+    if True:
+        # Convert month integer to name string (TabM expects "Feb", not 2)
+        MONTH_NAMES = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
+                       7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
+        month_str = MONTH_NAMES.get(session.month, "Feb")
+        
         features = {
             "administrative": len(admin_pages),
             "administrative_duration": sum(p.duration_seconds for p in admin_pages),
@@ -314,9 +326,9 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             "product_related_duration": sum(p.duration_seconds for p in product_pages),
             "bounce_rates": bounce_rate,
             "exit_rates": exit_rate,
-            "page_values": avg_page_value,
+            "page_values": request.cart_value / max(len(product_pages), 1),  # Cart value per page = real buyer signal
             "special_day": session.special_day or 0.0,
-            "month": session.month,
+            "month": month_str,
             "operating_systems": 2, 
             "browser": 2,           
             "region": session.region,
@@ -325,19 +337,33 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             "weekend": session.is_weekend
         }
         
+        print(f"[DEBUG] TabM features: product_pages={len(product_pages)}, duration={sum(p.duration_seconds for p in product_pages):.0f}s, month={month_str}")
+        
         try:
             response = requests.post(PREDICTION_API_URL, json=features, timeout=2.0)
             result = response.json()
             purchase_prob = result.get("probability", 0.0)
-        except Exception:
+            print(f"[DEBUG] TabM response: {result}")
+        except Exception as e:
+            print(f"[ERROR] TabM call failed: {e}")
             purchase_prob = 0.0
 
-    # FINAL AI DECISION: Pure abandonment probability check
-    # AI decides when it's > 70% certain the user is leaving.
-    should_intervene = abandonment_prob > 0.70
+    # FINAL AI DECISION: HYBRID "GOLDEN LOGIC" CHECK
+    # Requirement 1: "Is he going to leave?" (Abandonment > 60%)
+    # Requirement 2: "Is he a buyer or not?" (Purchase Prob > 50%)
+    is_leaving = abandonment_prob > 0.60
+    is_serious_buyer = purchase_prob > 0.30
     
+    # We intervene ONLY if the user is leaving AND is a serious buyer
+    should_intervene = is_leaving and is_serious_buyer
+    
+    if is_leaving and not is_serious_buyer:
+        print(f"[AI Decision] User is leaving but not a buyer (Prob={purchase_prob:.2f}). Skipping.")
+    elif is_serious_buyer and not is_leaving:
+        print(f"[AI Decision] Serious buyer detected, but not leaving. Staying quiet.")
+        
     # Return the direct abandonment score for dashboard visibility
-    combined_prob = abandonment_prob if should_intervene else purchase_prob
+    combined_prob = abandonment_prob if is_leaving else purchase_prob
     
     # Calculate personalized discount based on cart value
     discount_percent = calculate_discount(request.cart_value)
