@@ -1,1 +1,0 @@
-"""OP-ECOM Backend Application"""

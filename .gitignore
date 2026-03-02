@@ -26,6 +26,8 @@ htmlcov/
 *.joblib
 *.npy
 *.csv
+*.parquet
+data/*.parquet
 /scripts/data/*.csv
 /scripts/data/*.npy
 /scripts/data/item_properties_*
