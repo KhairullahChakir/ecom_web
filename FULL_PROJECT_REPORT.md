@@ -288,6 +288,19 @@ torch.onnx.export(
 | Top 5% | **88.62%** | Premium targeting |
 | Top 10% | 73.98% | Broad campaigns |
 | Top 20% | 61.45% | General outreach |
+| Top 1% (TCN) | **80.40%** | Precise Intervention |
+
+### 4.5 Sequential Behavioral Audit (500k Sessions)
+Final results for the Edge AI model (TCN) evaluated on the REES46 dataset.
+
+| Metric | Sequential TCN | GRU | LSTM |
+|--------|----------------|-----|------|
+| **AUC-ROC** | **0.726214** | 0.718042 | 0.694123 |
+| **Scientific Lift** | **11.84x** | 11.62x | 10.95x |
+| **Accuracy** | 95.2% | 95.2% | 94.8% |
+| **Inference** | **0.11ms** | 0.45ms | 0.52ms |
+
+**Conclusion**: The TCN architecture was selected due to its superior inference speed and the highest verified AUC for buyer identification in real-time clickstreams.
 
 ---
 

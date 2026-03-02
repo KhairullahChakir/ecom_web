@@ -1,0 +1,192 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Model Pruning Deep Dive</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code&display=swap" rel="stylesheet">
+        
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #34495e;
+        --accent-color: #27ae60;
+        --bg-color: #ffffff;
+        --text-color: #2c3e50;
+        --border-color: #ecf0f1;
+        --code-bg: #fdf6e3;
+    }
+    
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        color: var(--text-color);
+        max-width: 950px;
+        margin: 0 auto;
+        padding: 50px;
+        background-color: var(--bg-color);
+    }
+    
+    header {
+        border-bottom: 4px solid var(--accent-color);
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+    }
+    
+    h1 { color: var(--primary-color); font-size: 2.8em; margin-bottom: 0.1em; letter-spacing: -1px; }
+    h2 { color: var(--secondary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-top: 50px; font-weight: 600; }
+    h3 { color: var(--accent-color); margin-top: 30px; font-size: 1.4em; }
+    
+    p, li { font-size: 1.15em; margin-bottom: 18px; color: #444; }
+    
+    code {
+        background-color: var(--code-bg);
+        padding: 3px 6px;
+        border-radius: 6px;
+        font-family: 'Fira Code', 'Courier New', monospace;
+        font-size: 0.9em;
+        border: 1px solid #eee8d5;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 35px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    th, td {
+        padding: 16px 20px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    th {
+        background-color: var(--primary-color);
+        color: #ecf0f1;
+        font-weight: 500;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 1px;
+    }
+    
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #f5f5f5; }
+    
+    .footer {
+        margin-top: 70px;
+        padding-top: 30px;
+        border-top: 2px solid var(--border-color);
+        font-size: 0.95em;
+        color: #7f8c8d;
+        text-align: center;
+    }
+    
+    blockquote {
+        border-left: 6px solid var(--accent-color);
+        background: #f0fff4;
+        margin: 25px 0;
+        padding: 15px 30px;
+        font-style: italic;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .highlight {
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+    
+    @media print {
+        body { padding: 0; }
+        .no-print { display: none; }
+    }
+</style>
+
+    </head>
+    <body>
+        <header>
+            <p style="text-align: right; margin: 0; font-weight: 500; color: #95a5a6;">Optimization & Efficiency Phase</p>
+        </header>
+        
+        <h1>Deep Dive: Model Pruning &amp; Ensemble Optimization</h1>
+<p><em>Analysis of <code>04_model_pruning.ipynb</code></em></p>
+<h2>1. Objective</h2>
+<p>Following the discovery that TabM is the strongest model, this phase explores the <strong>Pruning Efficiency Frontier</strong>. The goal is to determine if we can reduce the ensemble size (K) to save memory and further reduce latency without sacrificing significant predictive power.</p>
+<hr />
+<h2>2. Pruning Strategy: Ensemble Reduction</h2>
+<p>Unlike weight pruning (removing individual neurons), this notebook focuses on <strong>Ensemble Pruning</strong>. 
+- <strong>TabM K=4</strong>: The full ensemble (4 parallel MLP blocks).
+- <strong>TabM K=2</strong>: A medium ensemble (2 parallel MLP blocks).
+- <strong>TabM K=1</strong>: A single MLP (Essentially fallback to a standard MLP with TabM embeddings).</p>
+<h3>Why Ensemble Pruning?</h3>
+<p>Since TabM's primary innovation is the efficient batch-parallel ensemble, reducing K directly reduces the number of matrix multiplications required for a single inference pass.</p>
+<hr />
+<h2>3. Results: Accuracy vs. Efficiency</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Config</th>
+<th style="text-align: left;">Ensemble Size (K)</th>
+<th style="text-align: left;">Validation AUC</th>
+<th style="text-align: left;">Latency (ONNX)</th>
+<th style="text-align: left;">Speedup vs K=4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Full</strong></td>
+<td style="text-align: left;"><strong>4</strong></td>
+<td style="text-align: left;"><strong>0.9327</strong></td>
+<td style="text-align: left;"><strong>0.1713 ms</strong></td>
+<td style="text-align: left;">-</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Mid</strong></td>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">0.9240</td>
+<td style="text-align: left;">0.1277 ms</td>
+<td style="text-align: left;">~1.34x</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pruned</strong></td>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">0.9203</td>
+<td style="text-align: left;">0.1150 ms</td>
+<td style="text-align: left;">~1.49x</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Observation</strong>: The "Accuracy Drop" from K=4 to K=1 is only <strong>~1.3%</strong>, while the latency drops by <strong>~33%</strong>. </p>
+<hr />
+<h2>4. The "Efficiency Frontier"</h2>
+<p>The notebook contains an "Efficiency Frontier" plot that visualizes this trade-off. 
+- <strong>The Sweet Spot</strong>: K=4 remains the winner for raw accuracy.
+- <strong>The Production Choice</strong>: While K=4 is fast (0.17ms), the e-commerce backend actually uses an even more pruned/optimized version for maximum throughput, as demonstrated in the final <code>backend/models/</code> artifacts.</p>
+<hr />
+<h2>5. Technical Implementation Details</h2>
+<ul>
+<li><strong>Training</strong>: Each variant was trained for 20 epochs using <code>AdamW</code> and <code>CosineAnnealingLR</code>.</li>
+<li><strong>Export</strong>: Models were exported to ONNX using dynamic axes, allowing the backend to handle varying batch sizes.</li>
+<li><strong>Benchmarking</strong>: Latency was measured using <code>time.perf_counter</code> with 100 warmup runs and 1000 benchmark loops on the CPU provider.</li>
+</ul>
+<hr />
+<h2>6. Conclusion</h2>
+<p>Model pruning proves that the <strong>TabM architecture is extremely robust</strong>. Even when reduced to a single MLP (K=1), the sophisticated feature embeddings and preprocessing allow it to outperform standard baselines while maintaining sub-millisecond sub-latency.</p>
+        
+        <div class="footer">
+            <p><strong>OP-ECOM Efficiency Audit Report</strong></p>
+            <p>Generated by Antigravity AI on February 28, 2026 - 23:43:18</p>
+        </div>
+        
+        <div class="no-print" style="position: fixed; bottom: 30px; right: 30px;">
+            <button onclick="window.print()" style="background: var(--accent-color); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 17px; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s;">
+                Print to PDF
+            </button>
+        </div>
+    </body>
+    </html>
+    

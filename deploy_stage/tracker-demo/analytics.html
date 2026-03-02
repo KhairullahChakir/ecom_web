@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics Dashboard - ShopDemo</title>
+  <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    .dashboard {
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .dashboard-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .dashboard-header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .dashboard-header p {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* KPI Cards - Glassmorphism on Orange */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .kpi-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 1.5rem;
+      border-radius: 16px;
+      color: white;
+      transition: 0.3s ease;
+    }
+
+    .kpi-card:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-4px);
+    }
+
+    .kpi-card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.8;
+      margin-bottom: 0.5rem;
+    }
+
+    .kpi-card .value {
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+
+    .kpi-card .subtitle {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+
+    .kpi-card .kpi-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      margin-bottom: 0.75rem;
+      font-size: 1.2rem;
+    }
+
+    /* Chart Section */
+    .chart-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .chart-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .chart-card h2 {
+      font-size: 1.1rem;
+      color: #fff;
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    /* Bar Charts - Orange variant */
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .bar-label {
+      width: 100px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 1.5rem;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.7));
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--orange-700, #C2410C);
+      font-weight: bold;
+      transition: width 0.8s ease;
+    }
+
+    .bar-rate {
+      width: 50px;
+      text-align: right;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .error {
+      text-align: center;
+      padding: 2rem;
+      color: #FCA5A5;
+    }
+
+    .refresh-note {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* XAI Cards */
+    .xai-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 0.75rem;
+      transition: 0.3s ease;
+    }
+
+    .xai-card:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .xai-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .xai-session {
+      font-family: 'Inter', monospace;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .xai-time {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.75rem;
+    }
+
+    .xai-score {
+      background: var(--white, #fff);
+      color: var(--orange-600, #EA580C);
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+
+    .xai-stats {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    .xai-stat {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0.4rem 0.7rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .xai-stat strong {
+      color: #fff;
+    }
+
+    .xai-reasons {
+      margin-top: 0.5rem;
+    }
+
+    .xai-reason {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      margin-right: 0.5rem;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a href="/" class="logo">Shop<span>Demo</span></a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/products">Products</a>
+      <a href="/about">About</a>
+      <a href="/analytics" class="active">Analytics</a>
+      <a href="/cart" class="cart-link">
+        Cart <span class="cart-count" id="cart-count">0</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <main class="dashboard">
+    <div class="dashboard-header">
+      <h1>AI Analytics Dashboard</h1>
+      <p>Real-time insights into AI intervention performance</p>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">👥</div>
+        <h3>Total Sessions</h3>
+        <div class="value" id="total-sessions">--</div>
+        <div class="subtitle">All-time visitors</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🤖</div>
+        <h3>Interventions Shown</h3>
+        <div class="value" id="total-interventions">--</div>
+        <div class="subtitle">AI popups triggered</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🎟️</div>
+        <h3>Discounts Claimed</h3>
+        <div class="value" id="total-claims">--</div>
+        <div class="subtitle" id="claim-rate">--% claim rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">💰</div>
+        <h3>Conversions</h3>
+        <div class="value" id="total-conversions">--</div>
+        <div class="subtitle" id="conversion-rate">--% conversion rate</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-section">
+      <div class="chart-card">
+        <h2>Recent Interventions</h2>
+        <div id="timeseries-chart">
+          <div class="loading">Loading...</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h2>Top Pages by Views</h2>
+        <div id="pages-chart">
+          <div class="loading">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- XAI Section -->
+    <div class="chart-card" style="margin-top: 1.5rem;">
+      <h2>AI Decision Explanations (XAI)</h2>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin-bottom: 1rem;">
+        Why did the AI decide to show interventions?
+      </p>
+      <div id="xai-details">
+        <div class="loading">Loading XAI data...</div>
+      </div>
+    </div>
+
+    <div class="refresh-note">
+      Auto-refreshes every 30 seconds | <span id="last-updated"></span>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <strong>ShopDemo</strong> &mdash; OP-ECOM Analytics Demo
+    <p class="tracker-info">Powered by AI-driven exit intent prediction</p>
+  </footer>
+
+  <script>
+    const API_BASE = 'http://localhost:8001';
+
+    async function fetchAnalytics() {
+      try {
+        const summaryRes = await fetch(`${API_BASE}/analytics/summary`);
+        if (summaryRes.ok) {
+          const summary = await summaryRes.json();
+          document.getElementById('total-sessions').textContent = summary.total_sessions.toLocaleString();
+          document.getElementById('total-interventions').textContent = summary.total_interventions.toLocaleString();
+          document.getElementById('total-claims').textContent = summary.total_claims.toLocaleString();
+          document.getElementById('total-conversions').textContent = summary.total_conversions.toLocaleString();
+          document.getElementById('claim-rate').textContent = `${summary.claim_rate}% claim rate`;
+          document.getElementById('conversion-rate').textContent = `${summary.conversion_rate}% conversion rate`;
+        }
+
+        const pagesRes = await fetch(`${API_BASE}/analytics/pages?limit=5`);
+        if (pagesRes.ok) {
+          const pages = await pagesRes.json();
+          const maxViews = Math.max(...pages.map(p => p.views), 1);
+          let pagesHtml = '';
+          pages.forEach(page => {
+            const width = (page.views / maxViews) * 100;
+            pagesHtml += `
+              <div class="bar-row">
+                <div class="bar-label" title="${page.page_title}">${page.page_title || 'Unknown'}</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: ${width}%">${page.views}</div>
+                </div>
+                <div class="bar-rate">${page.abandonment_rate}%</div>
+              </div>`;
+          });
+          document.getElementById('pages-chart').innerHTML = pagesHtml || '<div class="loading">No data yet</div>';
+        }
+
+        const timeRes = await fetch(`${API_BASE}/analytics/interventions?hours=24`);
+        if (timeRes.ok) {
+          const timeseries = await timeRes.json();
+          const maxVal = Math.max(...timeseries.map(t => t.interventions), 1);
+          let timeHtml = '';
+          timeseries.slice(-6).forEach(point => {
+            const width = (point.interventions / maxVal) * 100;
+            const hour = point.timestamp.split(' ')[1] || point.timestamp;
+            timeHtml += `
+              <div class="bar-row">
+                <div class="bar-label">${hour}</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: ${width}%">${point.interventions}</div>
+                </div>
+                <div class="bar-rate">${point.claims}</div>
+              </div>`;
+          });
+          document.getElementById('timeseries-chart').innerHTML = timeHtml || '<div class="loading">No data yet</div>';
+        }
+
+        const xaiRes = await fetch(`${API_BASE}/analytics/interventions/details?limit=5`);
+        if (xaiRes.ok) {
+          const xaiData = await xaiRes.json();
+          let xaiHtml = '';
+          xaiData.forEach(item => {
+            const reasons = item.xai_data?.reasons || ['AI detected exit intent'];
+            xaiHtml += `
+              <div class="xai-card">
+                <div class="xai-header">
+                  <div>
+                    <span class="xai-session">Session: ${item.session_id}</span>
+                    <span class="xai-time"> • ${item.timestamp}</span>
+                  </div>
+                  <span class="xai-score">${item.xai_data?.abandonment_score || item.event_value + '%'}</span>
+                </div>
+                <div class="xai-stats">
+                  <div class="xai-stat"><strong>${item.xai_data?.pages_viewed || 0}</strong> pages viewed</div>
+                  <div class="xai-stat"><strong>${item.xai_data?.product_pages || 0}</strong> product pages</div>
+                  <div class="xai-stat"><strong>${item.xai_data?.cart_items || 0}</strong> items in cart</div>
+                  <div class="xai-stat"><strong>${item.xai_data?.total_duration || '0s'}</strong> on site</div>
+                </div>
+                <div class="xai-reasons">
+                  ${reasons.map(r => `<span class="xai-reason">✓ ${r}</span>`).join('')}
+                </div>
+              </div>`;
+          });
+          document.getElementById('xai-details').innerHTML = xaiHtml || '<div class="loading">No interventions yet</div>';
+        }
+
+        document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        console.error('Analytics fetch error:', err);
+      }
+    }
+
+    fetchAnalytics();
+    setInterval(fetchAnalytics, 30000);
+
+    // Update cart count
+    const cart = JSON.parse(localStorage.getItem('shopDemo_cart') || '[]');
+    const totalItems = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
+    document.getElementById('cart-count').textContent = totalItems;
+  </script>
+</body>
+
+</html>

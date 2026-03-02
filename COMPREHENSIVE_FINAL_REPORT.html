@@ -204,11 +204,12 @@
 - <strong>Winner</strong>: TabM (Ensemble MLP)
 - <strong>Top Metrics</strong>: 0.923 AUC-ROC, 88.62% Precision@Top5%.
 - <strong>Optimization</strong>: ONNX conversion + Pruning (K=1) reduced latency to <strong>0.09ms</strong> (18x speedup).</p>
-<h3 id="32-sequence-modeling-real-world">3.2 Sequence Modeling (Real-World)</h3>
-<p>Validated on the <strong>RetailRocket</strong> dataset (382,780 sessions):
-- <strong>Abandonment Detection</strong>: TCN model achieved <strong>99.4% accuracy</strong>.
-- <strong>Generalization</strong>: 0% train-test gap (Overfitting Diagnostic confirmed).
-- <strong>Latency</strong>: 0.23ms inference.</p>
+<h3 id="32-sequence-modeling-big-data-audit">3.2 Sequence Modeling (Big Data Audit)</h3>
+<p>Validated on the <strong>REES46</strong> dataset (500,000 session subset):
+- <strong>Predictive Performance</strong>: TCN model achieved <strong>0.7262 AUC</strong> for buyer search.
+- <strong>Scientific Lift</strong>: <strong>11.84x</strong> Better than random at identifying purchases.
+- <strong>Strategic Benchmark</strong>: Outperformed GRU and LSTM architectures in balanced accuracy and latency.
+- <strong>Latency</strong>: 0.11ms inference (ONNX optimized).</p>
 <h2 id="4-system-capabilities">4. System Capabilities</h2>
 <h3 id="41-live-analytics-xai">4.1 Live Analytics &amp; XAI</h3>
 <p>Built a real-time dashboard (<code>analytics.html</code>) that provides:

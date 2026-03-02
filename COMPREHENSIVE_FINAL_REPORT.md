@@ -18,11 +18,12 @@ We evaluated multiple architectures on the UCI Shoppers dataset:
 - **Top Metrics**: 0.923 AUC-ROC, 88.62% Precision@Top5%.
 - **Optimization**: ONNX conversion + Pruning (K=1) reduced latency to **0.09ms** (18x speedup).
 
-### 3.2 Sequence Modeling (Real-World)
-Validated on the **RetailRocket** dataset (382,780 sessions):
-- **Abandonment Detection**: TCN model achieved **99.4% accuracy**.
-- **Generalization**: 0% train-test gap (Overfitting Diagnostic confirmed).
-- **Latency**: 0.23ms inference.
+### 3.2 Sequence Modeling (Big Data Audit)
+Validated on the **REES46** dataset (500,000 session subset):
+- **Predictive Performance**: TCN model achieved **0.7262 AUC** for buyer search.
+- **Scientific Lift**: **11.84x** Better than random at identifying purchases.
+- **Strategic Benchmark**: Outperformed GRU and LSTM architectures in balanced accuracy and latency.
+- **Latency**: 0.11ms inference (ONNX optimized).
 
 ## 4. System Capabilities
 

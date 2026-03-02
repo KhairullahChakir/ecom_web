@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Details - ShopDemo</title>
+    <meta name="description" content="View product details and add to cart.">
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">Shop<span>Demo</span></a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/products.html" class="active">Products</a>
+            <a href="/about.html">About</a>
+            <a href="/cart.html" class="cart-link">
+                Cart <span class="cart-count" id="cart-count">0</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Product Detail -->
+    <div id="product-detail"></div>
+
+    <!-- Tracker Notice -->
+    <div class="tracker-notice">
+        <div class="tracker-badge">
+            <span class="dot"></span>
+            Page Type: ProductRelated (Detail View)
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <strong>ShopDemo</strong> &mdash; OP-ECOM Analytics Demo
+        <p class="tracker-info">Powered by AI-driven exit intent prediction</p>
+    </footer>
+
+    <script src="http://185.197.31.25:8002/tracker/static/tracker.js" data-api="http://185.197.31.25:8002"></script>
+    <script src="/src/main.js"></script>
+</body>
+
+</html>

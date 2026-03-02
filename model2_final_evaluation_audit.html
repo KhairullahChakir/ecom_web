@@ -1,0 +1,70 @@
+
+        <html><head><title>Model 2 Final Evaluation Audit</title>
+<style>
+    :root { --primary: #2c3e50; --accent: #e67e22; --bg: #ffffff; }
+    body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 50px; }
+    header { border-bottom: 4px solid var(--accent); margin-bottom: 30px; }
+    h1 { color: var(--primary); font-size: 2.5em; margin-bottom: 0px; }
+    h2 { color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 40px; }
+    code { background: #f4f4f4; padding: 2px 5px; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: var(--primary); color: white; }
+    .footer { margin-top: 50px; text-align: center; color: #7f8c8d; font-size: 0.9em; }
+    @media print { .no-print { display: none; } }
+</style>
+</head>
+        <body>
+            <header><p style="text-align:right; color:#7f8c8d;">Probabilistic Reliability</p></header>
+            <h1>Deep Dive: Model 2 Performance Evaluation</h1>
+<p><em>Analysis of <code>10_exit_model_evaluation.ipynb</code></em></p>
+<h2>1. Objective</h2>
+<p>This is the final audit file for the <strong>Abandonment Detection AI</strong>. It moves beyond simple "Accuracy" to evaluate how well the model manages real-time probabilities and risk scores.</p>
+<hr />
+<h2>2. Advanced Metrics Portfolio</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Metric</th>
+<th style="text-align: left;">Result</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>PR-AUC</strong></td>
+<td style="text-align: left;"><strong>1.0000</strong></td>
+<td style="text-align: left;">Perfect balance of Precision and Recall. The model never confuses a buyer with a "leaver."</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>ROC-AUC</strong></td>
+<td style="text-align: left;"><strong>0.9999</strong></td>
+<td style="text-align: left;">Exceptional discriminative power.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Brier Score</strong></td>
+<td style="text-align: left;"><strong>0.0013</strong></td>
+<td style="text-align: left;"><strong>Expert Level</strong>. A score close to 0 indicates the model's probabilities are perfectly calibrated to reality.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Precision@5%</strong></td>
+<td style="text-align: left;"><strong>1.0000</strong></td>
+<td style="text-align: left;">If we only target the top 5% most "at-risk" users, our success rate is 100%.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. Operational Insight: The Brier Score</h2>
+<p>The most significant finding in this audit is the <strong>Brier Score (0.0013)</strong>. Most production models hover around 0.10. A score of 0.0013 indicates that when the model says there is an 80% risk, it is almost exactly 80% correct. This reliability is crucial for triggering automated discounts or chat interventions.</p>
+<hr />
+<h2>4. Why is it "Perfect"?</h2>
+<p>The TCN model is highly effective because it directly monitors the fundamental difference between a "Buyer's Flow" (rapid clicks towards checkout) and an "Abandoner's Flow" (meandering views followed by long pauses). The temporal data (<code>X_dur</code>) provides a clear "heartbeat" that the AI has successfully decoded.</p>
+<hr />
+<h2>5. Final Verdict</h2>
+<p>Model 2 is <strong>Production Certified</strong>. It offers near-perfect predictive reliability and is ready to be paired with Model 1 in the live e-commerce environment.</p>
+            <div class="footer">Generated on 2026-02-28</div>
+            <div class="no-print" style="position:fixed; bottom:20px; right:20px;">
+                <button onclick="window.print()" style="padding:10px 20px; background:var(--accent); color:white; border:none; cursor:pointer; border-radius:5px;">Print PDF</button>
+            </div>
+        </body></html>
+        

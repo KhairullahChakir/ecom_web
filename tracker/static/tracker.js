@@ -7,10 +7,10 @@
     'use strict';
 
     // Configuration
-    const API_URL = document.currentScript?.getAttribute('data-api') || 'http://localhost:8002';
+    const API_URL = 'http://localhost:8002'; // Local Development
     const SESSION_KEY = 'op_ecom_session_id';
     const AI_POLL_INTERVAL = 3000;
-    const AI_THRESHOLD = 0.60;
+    const AI_THRESHOLD = 0.40;
     const MODEL_URL = `${API_URL}/tracker/models/tcn_real_standalone.onnx`;
 
     // State
@@ -70,7 +70,7 @@
     }
 
     async function runLocalInference() {
-        if (!ortSession || exitIntentChecked) return;
+        if (!ortSession) return;
 
         // Skip high intent pages
         const path = window.location.pathname.toLowerCase();
@@ -84,15 +84,16 @@
             // Build the raw sequence: past events + current page
             const rawSeq = [...pageHistory, { type: currentType, duration: currentDwell }];
 
-            // MINIMUM HISTORY GATE: The model was trained on 96.4% abandonment data.
-            // Short sequences (< 3 events) always predict 100% because most short
-            // sessions in the training set were indeed abandonments.
-            // We need at least 3 meaningful events before the AI can make a fair judgment.
-            const MIN_EVENTS = 3;
+            // Pattern Threshold: We need at least 10 events to establish a reliable behavior pattern.
+            const MIN_EVENTS = 10;
             if (rawSeq.length < MIN_EVENTS) {
                 console.log(`[OP-ECOM Tracker] AI Engine: Collecting data... (${rawSeq.length}/${MIN_EVENTS} events)`);
                 return;
             }
+
+            // Verbose logging for Transparency
+            const eventsText = rawSeq.slice(-10).map(e => e.type).join(' -> ');
+            console.log(`[OP-ECOM Tracker] AI analyzing last 10 events: ${eventsText}`);
 
             // SEQUENCE FILLING: The model expects 20 events. With fewer events,
             // zeros cause 100% risk (model learned: zeros = no activity = abandoned).
@@ -124,14 +125,14 @@
             const logits = results[Object.keys(results)[0]].data[0];
             const prob = 1 / (1 + Math.exp(-logits));
 
-            // Log risk score
-            console.log(`[OP-ECOM Tracker] AI Prediction: ${(prob * 100).toFixed(1)}% abandonment risk (${rawSeq.length} events)`);
+            // Log risk score (Model 2: TCN)
+            console.log(`[OP-ECOM Tracker] Model 2 (TCN) Prediction: ${(prob * 100).toFixed(1)}% abandonment risk`);
 
             // Hybrid Check (The Golden Logic)
             if (prob > AI_THRESHOLD) {
                 // COOLDOWN: If we just checked this second, don't spam
                 const lastCheck = parseInt(sessionStorage.getItem('op_ecom_last_check') || '0');
-                if (Date.now() - lastCheck < 30000) return; // 30s cooldown for server hits
+                if (Date.now() - lastCheck < 5000) return; // 5s cooldown for demo
 
                 console.log(`[OP-ECOM Tracker] Local AI detected high risk (${(prob * 100).toFixed(1)}%). Verifying buyer value...`);
                 sessionStorage.setItem('op_ecom_last_check', Date.now().toString());

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmed - ShopDemo</title>
+    <meta name="description" content="Your order has been placed successfully.">
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">Shop<span>Demo</span></a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/products.html">Products</a>
+            <a href="/about.html">About</a>
+            <a href="/cart.html" class="cart-link">
+                Cart <span class="cart-count" id="cart-count">0</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Success Message -->
+    <div class="success-container">
+        <div class="success-icon">&#10003;</div>
+        <h1>Order Confirmed!</h1>
+        <p>Thank you for your purchase. Your order has been placed successfully
+            and will be shipped within 2-3 business days.</p>
+
+        <div class="success-details">
+            <span class="badge">Revenue Tracked</span>
+            <p style="margin-top: 0.75rem; color: #757575; font-size: 0.9rem;">
+                Conversion event recorded by OP-ECOM Analytics
+            </p>
+        </div>
+
+        <a href="/products.html" class="btn btn-primary">Continue Shopping</a>
+    </div>
+
+    <!-- Tracker Notice -->
+    <div class="tracker-notice">
+        <div class="tracker-badge">
+            <span class="dot"></span>
+            Conversion Tracked &bull; Revenue = TRUE
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <strong>ShopDemo</strong> &mdash; OP-ECOM Analytics Demo
+        <p class="tracker-info">Powered by AI-driven exit intent prediction</p>
+    </footer>
+
+    <script src="http://185.197.31.25:8002/tracker/static/tracker.js" data-api="http://185.197.31.25:8002"></script>
+    <script src="/src/main.js"></script>
+</body>
+
+</html>

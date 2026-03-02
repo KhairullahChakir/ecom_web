@@ -1,0 +1,224 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Master Model Comparison Audit</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code&display=swap" rel="stylesheet">
+        
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #34495e;
+        --accent-color: #f39c12;
+        --bg-color: #ffffff;
+        --text-color: #2c3e50;
+        --border-color: #ecf0f1;
+        --code-bg: #fdf6e3;
+    }
+    
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        color: var(--text-color);
+        max-width: 950px;
+        margin: 0 auto;
+        padding: 50px;
+        background-color: var(--bg-color);
+    }
+    
+    header {
+        border-bottom: 4px solid var(--accent-color);
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+    }
+    
+    h1 { color: var(--primary-color); font-size: 2.8em; margin-bottom: 0.1em; letter-spacing: -1px; }
+    h2 { color: var(--secondary-color); border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-top: 50px; font-weight: 600; }
+    h3 { color: var(--accent-color); margin-top: 30px; font-size: 1.4em; }
+    
+    p, li { font-size: 1.15em; margin-bottom: 18px; color: #444; }
+    
+    code {
+        background-color: var(--code-bg);
+        padding: 3px 6px;
+        border-radius: 6px;
+        font-family: 'Fira Code', 'Courier New', monospace;
+        font-size: 0.9em;
+        border: 1px solid #eee8d5;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 35px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    th, td {
+        padding: 16px 20px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    th {
+        background-color: var(--primary-color);
+        color: #ecf0f1;
+        font-weight: 500;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        letter-spacing: 1px;
+    }
+    
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #f5f5f5; }
+    
+    .footer {
+        margin-top: 70px;
+        padding-top: 30px;
+        border-top: 2px solid var(--border-color);
+        font-size: 0.95em;
+        color: #7f8c8d;
+        text-align: center;
+    }
+    
+    blockquote {
+        border-left: 6px solid var(--accent-color);
+        background: #fffbf0;
+        margin: 25px 0;
+        padding: 15px 30px;
+        font-style: italic;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .highlight {
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+    
+    @media print {
+        body { padding: 0; }
+        .no-print { display: none; }
+    }
+</style>
+
+    </head>
+    <body>
+        <header>
+            <p style="text-align: right; margin: 0; font-weight: 500; color: #95a5a6;">Final Tournament Phase</p>
+        </header>
+        
+        <h1>Deep Dive: Master Model Comparison</h1>
+<p><em>Analysis of <code>07_master_comparison.ipynb</code></em></p>
+<h2>1. Objective</h2>
+<p>This is the final research notebook for <strong>Model 1 (Purchase Intent)</strong>. It brings together all previous experiments to crown a winner and provide a definitive performance baseline for the production system.</p>
+<hr />
+<h2>2. Models Evaluated</h2>
+<p>The "Tournament" included:
+- <strong>Classical</strong>: Logistic Regression, Random Forest, XGBoost, SVM, Decision Tree.
+- <strong>Neural</strong>: DeepFM, TabM (K=4), FT-Transformer.</p>
+<hr />
+<h2>3. The Global Leaderboard (Test AUC-ROC)</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Rank</th>
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Category</th>
+<th style="text-align: left;">AUC-ROC</th>
+<th style="text-align: left;">F1-Score</th>
+<th style="text-align: left;">Recall (Buying Intent)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">🥇</td>
+<td style="text-align: left;"><strong>Random Forest</strong></td>
+<td style="text-align: left;">Classical</td>
+<td style="text-align: left;"><strong>0.930</strong></td>
+<td style="text-align: left;">0.659</td>
+<td style="text-align: left;">0.664</td>
+</tr>
+<tr>
+<td style="text-align: left;">🥈</td>
+<td style="text-align: left;"><strong>TabM (Ensemble)</strong></td>
+<td style="text-align: left;">Neural</td>
+<td style="text-align: left;"><strong>0.928</strong></td>
+<td style="text-align: left;">0.631</td>
+<td style="text-align: left;">0.832</td>
+</tr>
+<tr>
+<td style="text-align: left;">🥉</td>
+<td style="text-align: left;">XGBoost</td>
+<td style="text-align: left;">Classical</td>
+<td style="text-align: left;">0.922</td>
+<td style="text-align: left;">0.686</td>
+<td style="text-align: left;">0.748</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">SVM</td>
+<td style="text-align: left;">Classical</td>
+<td style="text-align: left;">0.909</td>
+<td style="text-align: left;">0.648</td>
+<td style="text-align: left;">0.775</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">DeepFM</td>
+<td style="text-align: left;">Neural</td>
+<td style="text-align: left;">0.907</td>
+<td style="text-align: left;">0.589</td>
+<td style="text-align: left;">0.848</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">Logistic Regression</td>
+<td style="text-align: left;">Classical</td>
+<td style="text-align: left;">0.897</td>
+<td style="text-align: left;">0.646</td>
+<td style="text-align: left;">0.759</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">FT-Transformer</td>
+<td style="text-align: left;">Neural</td>
+<td style="text-align: left;">0.772</td>
+<td style="text-align: left;">0.383</td>
+<td style="text-align: left;">0.874</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. Key Takeaways</h2>
+<h3>The "SOTA" Winner: TabM</h3>
+<p>While Random Forest barely edged out TabM in raw AUC, <strong>TabM</strong> is the superior choice for production because:
+1. <strong>Recall Sensitivity</strong>: TabM achieves a much higher recall (<strong>0.832</strong> vs 0.664), meaning it identifies 83% of actual buyers. In e-commerce, missing a buyer is more expensive than a false alarm.
+2. <strong>GPU Scalability</strong>: As the dataset grows, TabM (PyTorch) will scale better than Random Forest (which is CPU-bound).
+3. <strong>Optimizability</strong>: As seen in Phase 3/4, TabM can be pruned and exported to ONNX for 0.11ms latency.</p>
+<h3>The Failure of Transformers</h3>
+<p><strong>FT-Transformer</strong> performed poorly (0.772 AUC). This is a known phenomenon in tabular ML: Transformers often require much larger datasets (100k+ rows) to beat specialized MLP ensembles like TabM on smaller datasets (~12k rows).</p>
+<hr />
+<h2>5. Final Selection</h2>
+<p>The <strong>TabM (ONNX)</strong> model was selected for the <code>backend/</code> microservice. It represents the "Sweet Spot" on the Pruning Efficiency Frontier—offering high recall, competitive AUC, and industrial-grade inference speed.</p>
+<hr />
+<h2>6. Verification</h2>
+<p>All models were tested on a dedicated 10% holdout set (<code>random_state=42</code>) with standardized preprocessing (StandardScaler + Label Encoding) to ensure zero data leakage.</p>
+        
+        <div class="footer">
+            <p><strong>OP-ECOM Model Leaderboard Report</strong></p>
+            <p>Generated by Antigravity AI on February 28, 2026 - 23:43:21</p>
+        </div>
+        
+        <div class="no-print" style="position: fixed; bottom: 30px; right: 30px;">
+            <button onclick="window.print()" style="background: var(--accent-color); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 17px; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s;">
+                Print to PDF
+            </button>
+        </div>
+    </body>
+    </html>
+    

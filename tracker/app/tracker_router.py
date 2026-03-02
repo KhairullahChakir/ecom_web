@@ -23,7 +23,7 @@ from .schemas import (
 )
 
 # Model paths
-PREDICTION_API_URL = "http://localhost:8000/predict"
+PREDICTION_API_URL = os.getenv("PREDICTION_API_URL", "http://localhost:8000/predict")
 # Use absolute path to avoid relative path issues
 _base_dir = os.path.dirname(os.path.abspath(__file__))
 TRANSFORMER_MODEL_PATH = os.path.normpath(os.path.join(_base_dir, "..", "models", "tcn_real_standalone.onnx"))
@@ -348,19 +348,21 @@ async def check_intent(request: IntentCheckRequest, db: DBSession = Depends(get_
             print(f"[ERROR] TabM call failed: {e}")
             purchase_prob = 0.0
 
-    # FINAL AI DECISION: HYBRID "GOLDEN LOGIC" CHECK
-    # Requirement 1: "Is he going to leave?" (Abandonment > 60%)
-    # Requirement 2: "Is he a buyer or not?" (Purchase Prob > 50%)
-    is_leaving = abandonment_prob > 0.60
-    is_serious_buyer = purchase_prob > 0.30
+    # FINAL HYBRID AI LOGIC: Real-time alignment between Edge (TCN) and Server (TabM)
+    # 1. Is the risk of leaving high? (TCN > 50%)
+    # 2. Is this a serious buyer? (TabM > 15%)
+    is_leaving = abandonment_prob > 0.50
+    is_serious_buyer = purchase_prob > 0.15
     
-    # We intervene ONLY if the user is leaving AND is a serious buyer
+    # INTERVENTION RULE: Only intervene if BOTH models agree
     should_intervene = is_leaving and is_serious_buyer
     
-    if is_leaving and not is_serious_buyer:
-        print(f"[AI Decision] User is leaving but not a buyer (Prob={purchase_prob:.2f}). Skipping.")
-    elif is_serious_buyer and not is_leaving:
-        print(f"[AI Decision] Serious buyer detected, but not leaving. Staying quiet.")
+    if should_intervene:
+        print(f"[Golden Logic] AGREED: Triggering intervention. (Risk={abandonment_prob:.2f}, Purchase={purchase_prob:.2f})")
+    elif is_leaving:
+        print(f"[AI Decision] Wait. High risk ({abandonment_prob:.2f}) but low intent ({purchase_prob:.2f}).")
+    else:
+        print(f"[AI Decision] Status: Normal browsing. (Risk={abandonment_prob:.2f}, Intent={purchase_prob:.2f})")
         
     # Return the direct abandonment score for dashboard visibility
     combined_prob = abandonment_prob if is_leaving else purchase_prob
