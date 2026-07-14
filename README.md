@@ -1,73 +1,91 @@
-# OP-ECOM: Online Shoppers Purchase Prediction API
+# E-Commerce Analytics & Machine Learning Platform
 
-A fast CPU inference ML service predicting **purchase intent** using the UCI Online Shoppers dataset.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](https://www.python.org/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-orange.svg)](https://jupyter.org/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)](https://www.docker.com/)
 
-## 🎯 Features
+## 📖 Overview
+The **E-Commerce Analytics & Machine Learning Platform** (`ecom_web`) is an advanced data science repository dedicated to analyzing e-commerce behavior and optimizing business metrics using machine learning. 
 
-- **Model-as-an-API**: POST `/predict` → returns label, probability, latency
-- **Fast Inference**: ONNX Runtime optimized for <10ms CPU inference
-- **Beautiful Demo**: Next.js frontend with لاجوردی (Lapis Lazuli) theme
+This repository encapsulates the full data lifecycle: from raw dataset analysis and exploratory data analysis (EDA) in Jupyter Notebooks, to training multiple predictive models, and ultimately deploying these models via a backend service. It also includes comprehensive reports detailing the model architectures and findings.
 
-## 🛠️ Tech Stack
+## ✨ Features
+* **Extensive Data Analysis**: `analyze_dataset.py` and Jupyter notebooks to uncover trends in e-commerce purchasing behavior.
+* **Predictive Modeling**: Multiple machine learning models tracked and evaluated against business KPIs.
+* **Comprehensive Documentation**: Detailed research reports, model performance metrics, and architectural breakdowns (located in the `/reports` directory).
+* **Containerized Deployment**: Ready-to-deploy backend architecture using Docker and `docker-compose`.
+* **Cross-Platform Scripts**: Includes PowerShell (`.ps1`) and Bash (`.sh`) scripts for seamless local execution and deployment.
 
-| Layer | Technology |
-|-------|------------|
-| Backend | Python, FastAPI, ONNX Runtime |
-| Frontend | Next.js, React, Tailwind CSS |
-| ML Models | Logistic Regression, XGBoost, TabM |
-
-## 🎨 Theme Colors (لاجوردی)
-
-- Primary: `#1E4FA8`
-- Dark: `#163B7A`
-- Light: `#E8F0FF`
+## 🚀 Technologies Used
+* **Data Science**: Python, Pandas, Scikit-Learn, Jupyter Notebook
+* **Backend**: Python (Flask/FastAPI context)
+* **Infrastructure**: Docker, Docker Compose
+* **Scripting**: PowerShell, Bash
 
 ## 📁 Project Structure
+```text
+ecom_web/
+├── backend/                  # API server for model inference
+├── data/                     # Raw and processed datasets
+├── notebooks/                # Jupyter Notebooks for EDA and Model Training
+├── reports/                  # Markdown research reports and thesis chapters
+│   ├── COMPREHENSIVE_FINAL_REPORT.md
+│   ├── FULL_PROJECT_REPORT.md
+│   ├── MODEL_1_REPORT.md
+│   ├── MODEL_2_REPORT.md
+│   └── thesis_chapter_4_architecture.md
+├── scripts/                  # Helper automation scripts
+├── tracker/                  # Model tracking services
+├── tracker-demo/             # Demo application for the tracking service
+├── analyze_dataset.py        # Core dataset analysis script
+├── deploy.sh                 # Unix deployment script
+├── docker-compose.yml        # Docker orchestration file
+├── run_all.ps1               # Windows execution script
+├── run_local.ps1             # Windows local testing script
+├── .gitignore                # Git ignores
+├── LICENSE                   # MIT License
+└── README.md                 # Project documentation
+```
 
-| Component | Path | Technology | Port |
-|-----------|------|------------|------|
-| **AI Brain** | `backend/` | FastAPI + ONNX | 8000 |
-| **Tracker API** | `tracker/` | FastAPI + MariaDB | 8001 |
-| **Predictor UI** | `frontend/` | Next.js | 3000 |
-| **E-com Demo** | `tracker-demo/` | Vite + Vue | 5173 |
+## 📸 Screenshots
+*(Coming soon - Screenshots of the analytics dashboard and model metrics)*
 
-## 🚀 Running the Project (Developer Shortcut)
+## 🛠️ Installation & Setup
 
-The easiest way to work on the project in VS Code is to use **one single virtual environment** at the root.
+### 1. Data Science Environment
+If you wish to run the analysis scripts or notebooks:
+```bash
+git clone https://github.com/KhairullahChakir/ecom_web.git
+cd ecom_web
 
-### 1. Create & Activate Environment
-```powershell
-# Run from D:\op_ecom
+# Create and activate virtual environment
 python -m venv venv
-.\venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install requirements (ensure you have jupyter, pandas, scikit-learn installed)
+pip install -r requirements.txt # (If available in scripts)
+python analyze_dataset.py
 ```
 
-### 2. Install All Dependencies
+### 2. Docker Deployment
+To spin up the backend and tracking services using Docker:
+```bash
+docker-compose up --build -d
+```
+
+### 3. Local Script Execution (Windows)
 ```powershell
-pip install fastapi uvicorn pandas numpy scikit-learn xgboost torch onnxruntime sqlalchemy mysqlclient requests python-multipart
+.\run_local.ps1
 ```
 
-### 3. VS Code Integration
-*   Press `Ctrl + Shift + P`.
-*   Select **Python: Select Interpreter**.
-*   Choose the root `.\venv\Scripts\python.exe`. (This clears all red squiggles in your code!)
+## 🔮 Future Improvements
+* **Automated Data Pipelines**: Integrate Apache Airflow or Luigi for automated daily data ingestion.
+* **Web Dashboard**: Implement a Streamlit or Dash frontend to visualize model predictions for non-technical users.
+* **CI/CD**: Add GitHub Actions for automated linting and Docker image builds.
 
-### 4. Start the Servers (Different Terminals)
-*   **AI Brain**: `python -m uvicorn backend.app.main:app --port 8000`
-*   **Tracker**: `python -m uvicorn tracker.app.main:app --port 8001`
-*   **Predictor UI**: `cd frontend; npm run dev`
-*   **E-com Demo**: `cd tracker-demo; npm run dev`
+## 🤝 Contributing
+Contributions, issues, and feature requests are welcome!
 
-## 📊 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/predict` | POST | Get prediction |
-
-## 📈 Dataset
-
-UCI Online Shoppers Purchasing Intention
-- 12,330 sessions
-- 18 features
-- Target: Revenue (Yes/No)
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
